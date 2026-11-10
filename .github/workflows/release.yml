@@ -1,0 +1,54 @@
+name: Release
+
+# Publica uma nova versão quando uma tag vX.Y.Z é enviada.
+# O app instalado detecta o Release e oferece a atualização ao usuário.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Preparar chave de assinatura
+        env:
+          KS: ${{ secrets.ZUVION_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KS" ]; then echo "::error::Secret ZUVION_KEYSTORE_B64 ausente"; exit 1; fi
+          echo "$KS" | base64 -d > "$RUNNER_TEMP/zuvion.p12"
+          echo "ZUVION_KEYSTORE_PATH=$RUNNER_TEMP/zuvion.p12" >> "$GITHUB_ENV"
+
+      - name: Compilar e assinar
+        env:
+          ZUVION_KEYSTORE_PASSWORD: ${{ secrets.ZUVION_KEYSTORE_PASSWORD }}
+          ZUVION_KEY_ALIAS: ${{ secrets.ZUVION_KEY_ALIAS }}
+          ZUVION_KEY_PASSWORD: ${{ secrets.ZUVION_KEY_PASSWORD }}
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          gradle :app:assembleRelease -PversionName="$V" -PgithubRepo="$GITHUB_REPOSITORY" --no-daemon --stacktrace
+          mkdir -p out
+          for f in app/build/outputs/apk/release/*.apk; do
+            abi=$(basename "$f" .apk | sed -e 's/^app-//' -e 's/-release$//')
+            cp "$f" "out/ZuvionTV-$V-$abi.apk"
+          done
+          ls -la out
+
+      - name: Publicar Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          if [ -f "release-notes/$V.md" ]; then NOTES=(--notes-file "release-notes/$V.md"); else NOTES=(--generate-notes); fi
+          gh release create "$GITHUB_REF_NAME" out/*.apk --title "Zuvion TV $V" "${NOTES[@]}"

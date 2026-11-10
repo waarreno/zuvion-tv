@@ -1,0 +1,39 @@
+package com.zuvion.tv.player
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import kotlinx.coroutines.flow.StateFlow
+
+data class EngineState(
+    val playing: Boolean = false,
+    val buffering: Boolean = true,
+    val error: String? = null,
+    val ended: Boolean = false,
+    val videoSize: String? = null
+)
+
+data class Track(val id: String, val label: String, val selected: Boolean)
+
+enum class AspectMode(val label: String) { FIT("Ajustar"), FILL("Preencher"), ZOOM("Zoom") }
+
+interface VideoEngine {
+    val name: String
+    val state: StateFlow<EngineState>
+    val position: Long
+    val duration: Long
+    fun play(url: String, startMs: Long = 0)
+    fun togglePause()
+    fun pause()
+    fun seekTo(ms: Long)
+    fun seekBy(ms: Long) = seekTo((position + ms).coerceAtLeast(0))
+    fun setVolume(v: Float)
+    fun audioTracks(): List<Track>
+    fun subtitleTracks(): List<Track>
+    fun selectAudio(id: String)
+    fun selectSubtitle(id: String?)
+    fun setAspect(mode: AspectMode)
+    fun release()
+
+    @Composable
+    fun Surface(modifier: Modifier)
+}
