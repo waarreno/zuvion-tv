@@ -189,14 +189,40 @@ class ContentRepository(
         return c == null || !(c.adult && (kids || hide))
     }
 
+    // Índice de formatos (mesmo canal/filme em SD/HD/FHD/4K), refeito quando a lista muda.
+    private var groupIndex: Map<String, List<Content>> = emptyMap()
+    private var groupIndexOf: Library? = null
+
+    private fun groups(): Map<String, List<Content>> {
+        val lib = _library.value
+        if (groupIndexOf !== lib) {
+            groupIndex = (lib.items[Kind.LIVE].orEmpty() + lib.items[Kind.MOVIE].orEmpty()).groupBy { Variants.key(it) }
+            groupIndexOf = lib
+        }
+        return groupIndex
+    }
+
+    private val preferred get() = store.settings.preferredFormat
+
+    /** Todos os formatos disponíveis do mesmo canal/filme, do preferido para o menos indicado. */
+    fun variantsOf(c: Content): List<Content> {
+        if (c.kind != Kind.LIVE && c.kind != Kind.MOVIE) return listOf(c)
+        val g = synchronized(this) { groups() }[Variants.key(c)].orEmpty()
+        val all = if (g.none { it.key == c.key }) listOf(c) + g else g
+        return all.distinctBy { it.key }.sortedBy { Variants.score(it, null) }
+    }
+
+    /** O formato preferido do mesmo conteúdo (usado ao abrir de favoritos/histórico). */
+    fun preferredVariant(c: Content): Content = variantsOf(c).minByOrNull { Variants.score(it, preferred) } ?: c
+
     fun categories(kind: Kind): List<Category> = _library.value.categories[kind].orEmpty().filter { allowed(it) }
 
     suspend fun itemsIn(kind: Kind, categoryId: String?): List<Content> {
         val lib = _library.value
         val all = lib.items[kind].orEmpty()
         val catById = lib.categories[kind].orEmpty().associateBy { it.id }
-        if (categoryId == null) return all.filter { allowed(catById[it.categoryId]) }
-        if (all.isNotEmpty()) return all.filter { it.categoryId == categoryId }
+        if (categoryId == null) return Variants.dedupe(all.filter { allowed(catById[it.categoryId]) }, preferred)
+        if (all.isNotEmpty()) return Variants.dedupe(all.filter { it.categoryId == categoryId }, preferred)
         val src = source ?: return emptyList()
         return lock.withLock {
             categoryCache.getOrPut("$kind:$categoryId") { runCatching { src.itemsInCategory(kind, categoryId) }.getOrDefault(emptyList()) }
@@ -209,7 +235,7 @@ class ContentRepository(
         val lib = _library.value
         return listOf(Kind.LIVE, Kind.MOVIE, Kind.SERIES).flatMap { k ->
             val cats = lib.categories[k].orEmpty().associateBy { it.id }
-            lib.items[k].orEmpty().asSequence().filter { it.name.lowercase().contains(q) && allowed(cats[it.categoryId]) }.take(60).toList()
+            Variants.dedupe(lib.items[k].orEmpty().asSequence().filter { it.name.lowercase().contains(q) && allowed(cats[it.categoryId]) }.take(150).toList(), preferred).take(60)
         }
     }
 

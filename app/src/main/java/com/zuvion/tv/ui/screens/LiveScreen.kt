@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.zuvion.tv.data.Category
 import com.zuvion.tv.data.Content
 import com.zuvion.tv.data.Kind
+import com.zuvion.tv.data.title
 import com.zuvion.tv.ui.AppState
 import com.zuvion.tv.ui.components.Chip
 import com.zuvion.tv.ui.components.ChannelLogo
@@ -155,7 +156,7 @@ fun ChannelRowItem(state: AppState, c: Content, hasEpg: Boolean, onFocus: (() ->
         Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ChannelLogo(c, 46.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(c.name, style = MaterialTheme.typography.titleMedium, color = Z.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(c.title, style = MaterialTheme.typography.titleMedium, color = Z.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (now != null) {
                     Text(now.title, style = MaterialTheme.typography.labelMedium, color = Z.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     ProgressLine(now.progress(), Modifier.width(160.dp), height = 3.dp)
@@ -179,7 +180,7 @@ private fun ChannelPreview(state: AppState, c: Content, modifier: Modifier) {
     Column(modifier.glass(RoundedCornerShape(28.dp)).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ChannelLogo(c, 52.dp)
-            Text(c.name, style = MaterialTheme.typography.titleLarge, color = Z.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(c.title, style = MaterialTheme.typography.titleLarge, color = Z.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         if (progs.isEmpty()) Text("Sem guia de programação para este canal.", color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
         val fmt = remember { java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()) }

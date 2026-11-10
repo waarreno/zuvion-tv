@@ -108,7 +108,7 @@ fun GuideScreen(state: AppState) {
         }
         when {
             channels == null -> LoadingView()
-            programs.isEmpty() && !loadingEpg -> EmptyView("Esta lista não tem guia (EPG). Em Ajustes você pode informar uma URL XMLTV.")
+            programs.isEmpty() && !loadingEpg -> EmptyView("Esta lista não tem guia (EPG). Em Configurações você pode informar uma URL XMLTV.")
             programs.isEmpty() -> LoadingView("Baixando o guia de programação…")
             channels.isEmpty() -> EmptyView("Nenhum canal nesta categoria.")
             else -> Column(Modifier.fillMaxSize().padding(horizontal = 12.dp).glass(RoundedCornerShape(24.dp)).padding(10.dp)) {

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -50,6 +51,9 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.zuvion.tv.data.Content
 import com.zuvion.tv.data.SeriesInfo
+import com.zuvion.tv.data.Variants
+import com.zuvion.tv.data.title
+import androidx.compose.foundation.layout.navigationBarsPadding
 import com.zuvion.tv.meta.EpisodeMeta
 import com.zuvion.tv.meta.Meta
 import com.zuvion.tv.ui.AppState
@@ -87,23 +91,28 @@ fun MovieDetailScreen(state: AppState, base: Content) {
     val data by state.store.data.collectAsState()
     // TMDB primeiro; os dados do servidor só são buscados se o TMDB não encontrar.
     val detail by produceState(base to state.meta.cached(base), base.key) {
-        val m = state.meta.forContent(base)
+        val m = state.meta.forContent(base, full = true)
         val server = if (m == null || m.overview.isBlank()) runCatching { state.repo.source?.movieInfo(base) }.getOrNull() ?: base else base
         value = server to m
     }
     val (item, m) = detail
     val fav = remember(data) { state.store.isFavorite(base) }
-    val progress = remember(data) { state.store.progressOf(base) }
+    // Progresso em qualquer formato do mesmo filme.
+    val progress = remember(data) { state.repo.variantsOf(base).firstNotNullOfOrNull { state.store.progressOf(it) } }
     val fr = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
-    val playable = item.copy(tmdbId = m?.tmdbId ?: item.tmdbId)
+    // Toca o formato preferido (o usuário pode trocar no player).
+    val playable = remember(item, m, progress) {
+        val v = progress?.item ?: state.repo.preferredVariant(base)
+        (if (v.key == base.key) item else v).copy(tmdbId = m?.tmdbId ?: item.tmdbId)
+    }
     val poster = m?.poster ?: item.poster
     val genres = m?.genres.orEmpty()
 
     Box(Modifier.fillMaxSize()) {
         Backdrop(m?.backdrop ?: poster)
         Row(
-            Modifier.fillMaxSize().statusBarsPadding().padding(if (tv) 48.dp else 20.dp),
+            Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(if (tv) 48.dp else 20.dp),
             horizontalArrangement = Arrangement.spacedBy(32.dp),
             verticalAlignment = if (tv) Alignment.CenterVertically else Alignment.Top
         ) {
@@ -115,14 +124,19 @@ fun MovieDetailScreen(state: AppState, base: Content) {
                 if (!tv) IconGlassButton(Icons.AutoMirrored.Outlined.ArrowBack, "Voltar", { state.pop() }, size = 44.dp)
                 if (!tv) Poster(poster, item.name, Modifier.width(150.dp).height(222.dp).clip(RoundedCornerShape(20.dp)), label = item.name)
                 Text(if (genres.isEmpty()) "FILME" else "FILME · " + genres.take(3).joinToString(" · ").uppercase(), style = MaterialTheme.typography.labelSmall, color = Z.Cyan)
-                Text(m?.title?.ifBlank { null } ?: item.name, style = if (tv) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium, color = Z.Text)
-                val line = metaLine(item, m, item.extension?.uppercase())
+                Text(m?.title?.ifBlank { null } ?: item.title, style = if (tv) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium, color = Z.Text)
+                // Qualidade (Full HD, 4K…) em vez do tipo de arquivo; com vários formatos, mostra todos.
+                val qualities = remember(base.key) {
+                    state.repo.variantsOf(base).map { Variants.quality(it.name) }.filter { it.isNotEmpty() }.distinct()
+                        .sortedBy { listOf("4K", "Full HD", "HD", "SD").indexOf(it) }
+                }
+                val line = metaLine(item, m, qualities.joinToString(" / ").ifEmpty { null })
                 if (line.isNotBlank()) Text(line, color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
                 val plot = m?.overview?.ifBlank { null } ?: item.plot
                 plot?.let { Text(it, color = Z.Muted, style = MaterialTheme.typography.bodyLarge, maxLines = if (tv) 6 else 12, overflow = TextOverflow.Ellipsis) }
                 val people = listOfNotNull(m?.director?.let { "Direção: $it" }, m?.cast?.takeIf { it.isNotEmpty() }?.let { "Elenco: " + it.take(5).joinToString() })
                 people.forEach { Text(it, color = Z.Faint, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis) }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     val resume = progress?.takeIf { it.fraction in 0.01f..0.95f }
                     PillButton(if (resume != null) "Continuar" else "Assistir", { state.play(playable) }, Modifier.focusRequester(fr), icon = Icons.Outlined.PlayArrow, primary = true)
                     if (resume != null) PillButton("Do início", { state.play(playable, startMs = 0) }, icon = Icons.Outlined.Replay)
@@ -138,7 +152,7 @@ fun MovieDetailScreen(state: AppState, base: Content) {
 fun SeriesDetailScreen(state: AppState, item: Content) {
     val tv = LocalIsTv.current
     val data by state.store.data.collectAsState()
-    val meta by produceState(state.meta.cached(item), item.key) { value = state.meta.forContent(item) }
+    val meta by produceState(state.meta.cached(item), item.key) { value = state.meta.forContent(item, full = true) }
     val info by produceState<SeriesInfo?>(null, item.key) {
         value = runCatching { state.repo.source?.seriesInfo(item) }.getOrNull() ?: SeriesInfo(item.plot, item.poster, emptyMap())
     }
@@ -177,7 +191,7 @@ private fun SeriesBody(
     val genres = m?.genres.orEmpty()
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     LazyColumn(
-        Modifier.fillMaxSize().statusBarsPadding(),
+        Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(),
         contentPadding = PaddingValues(if (tv) 48.dp else 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -187,11 +201,11 @@ private fun SeriesBody(
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (!tv) IconGlassButton(Icons.AutoMirrored.Outlined.ArrowBack, "Voltar", { state.pop() }, size = 44.dp)
                     Text(if (genres.isEmpty()) "SÉRIE" else "SÉRIE · " + genres.take(3).joinToString(" · ").uppercase(), style = MaterialTheme.typography.labelSmall, color = Z.Cyan)
-                    Text(m?.title?.ifBlank { null } ?: series.name, style = if (tv) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium, color = Z.Text)
+                    Text(m?.title?.ifBlank { null } ?: series.title, style = if (tv) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium, color = Z.Text)
                     Text(metaLine(series, m?.copy(runtime = 0), "${i.seasons.size} temporada(s)"), color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
                     (m?.overview?.ifBlank { null } ?: i.plot)?.let { Text(it, color = Z.Muted, style = MaterialTheme.typography.bodyLarge, maxLines = 5, overflow = TextOverflow.Ellipsis) }
                     m?.cast?.takeIf { it.isNotEmpty() }?.let { Text("Elenco: " + it.take(5).joinToString(), color = Z.Faint, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         val last = data.profileData[state.store.activeProfile?.id]?.history
                             ?.firstOrNull { it.item.seriesId == series.id && it.item.playlistId == series.playlistId }
                         val target = last?.item?.copy(tmdbId = tmdbId) ?: allEpisodes.firstOrNull()

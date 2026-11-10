@@ -33,7 +33,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -54,6 +56,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
 import com.zuvion.tv.ZuvionApp
 import com.zuvion.tv.data.Content
+import com.zuvion.tv.data.title
 import com.zuvion.tv.ui.theme.Z
 import com.zuvion.tv.ui.theme.glass
 
@@ -80,7 +83,7 @@ fun Focusable(
     Box(
         modifier
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .then(if (focused) Modifier.shadow(24.dp, shape, ambientColor = Z.Violet, spotColor = Z.Violet) else Modifier)
+            .then(if (focused) Modifier.focusGlow(shape) else Modifier)
             .then(if (glass) Modifier.glass(shape, strong = selected) else Modifier.clip(shape))
             .then(if (fill != null) Modifier.background(fill) else Modifier)
             .then(if (focused) Modifier.border(3.dp, Z.Focus, shape) else Modifier)
@@ -96,6 +99,17 @@ fun Focusable(
             ),
         content = { content(focused) }
     )
+}
+
+/** Brilho suave em volta do item focado (sem sombra de elevação, que deixava "quadrados" brancos em algumas TVs). */
+private fun Modifier.focusGlow(shape: Shape): Modifier = drawBehind {
+    for (i in 1..4) {
+        val grow = i * 3.dp.toPx()
+        val outline = shape.createOutline(androidx.compose.ui.geometry.Size(size.width + grow * 2, size.height + grow * 2), layoutDirection, this)
+        translate(-grow, -grow) {
+            drawOutline(outline, Z.VioletDeep.copy(alpha = 0.16f / i))
+        }
+    }
 }
 
 @Composable
@@ -148,8 +162,8 @@ fun Logo(size: Dp = 44.dp, modifier: Modifier = Modifier) {
 @Composable
 fun Wordmark(fontSize: Int = 22) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Zuvion ", fontSize = fontSize.sp, fontWeight = FontWeight.SemiBold, fontFamily = com.zuvion.tv.ui.theme.Sora, color = Z.Text)
-        Text("TV", fontSize = fontSize.sp, fontWeight = FontWeight.SemiBold, fontFamily = com.zuvion.tv.ui.theme.Sora, color = Z.Violet)
+        Text("Zuvion ", maxLines = 1, softWrap = false, fontSize = fontSize.sp, fontWeight = FontWeight.SemiBold, fontFamily = com.zuvion.tv.ui.theme.Sora, color = Z.Text)
+        Text("TV", maxLines = 1, softWrap = false, fontSize = fontSize.sp, fontWeight = FontWeight.SemiBold, fontFamily = com.zuvion.tv.ui.theme.Sora, color = Z.Violet)
     }
 }
 
@@ -182,18 +196,18 @@ fun PosterCard(item: Content, onClick: () -> Unit, modifier: Modifier = Modifier
     val poster = rememberMetaPoster(item)
     Column(modifier.width(width), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Focusable(onClick, Modifier.fillMaxWidth().height(width * 1.48f), RoundedCornerShape(18.dp), onLongClick = onLongClick, onFocus = onFocus) {
-            Poster(poster, item.name, Modifier.fillMaxSize(), label = item.name)
+            Poster(poster, item.name, Modifier.fillMaxSize(), label = item.title)
             if (progress != null) ProgressLine(progress, Modifier.align(Alignment.BottomCenter).padding(8.dp))
         }
-        Text(item.name, style = MaterialTheme.typography.labelMedium, color = Z.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(item.title, style = MaterialTheme.typography.labelMedium, color = Z.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 /** Cartão horizontal (continuar assistindo / episódios). */
 @Composable
-fun WideCard(title: String, image: String?, onClick: () -> Unit, modifier: Modifier = Modifier, width: Dp = 220.dp, progress: Float? = null, subtitle: String? = null, onFocus: (() -> Unit)? = null) {
+fun WideCard(title: String, image: String?, onClick: () -> Unit, modifier: Modifier = Modifier, width: Dp = 220.dp, progress: Float? = null, subtitle: String? = null, onFocus: (() -> Unit)? = null, onLongClick: (() -> Unit)? = null) {
     Column(modifier.width(width), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Focusable(onClick, Modifier.fillMaxWidth().height(width * 0.57f), RoundedCornerShape(22.dp), onFocus = onFocus) {
+        Focusable(onClick, Modifier.fillMaxWidth().height(width * 0.57f), RoundedCornerShape(22.dp), onFocus = onFocus, onLongClick = onLongClick) {
             Poster(image, title, Modifier.fillMaxSize())
             if (progress != null) ProgressLine(progress, Modifier.align(Alignment.BottomCenter).padding(10.dp))
         }

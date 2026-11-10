@@ -39,6 +39,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.produceState
 import com.zuvion.tv.data.EpgProgram
+import com.zuvion.tv.data.Variants
+import com.zuvion.tv.data.title
+import androidx.compose.material.icons.outlined.HighQuality
 import com.zuvion.tv.meta.SkipTimes
 import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -139,7 +142,12 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
     val scope = rememberCoroutineScope()
     val list = remember(s) { s.list.ifEmpty { listOf(s.item) } }
     var index by remember(s) { mutableIntStateOf(list.indexOfFirst { it.key == s.item.key }.coerceAtLeast(0)) }
-    val media = list.getOrElse(index) { s.item }
+    val baseItem = list.getOrElse(index) { s.item }
+    // Formato escolhido no player (SD/HD/Full HD/4K…) para este canal/filme.
+    var variantPick by remember(s, index) { mutableStateOf<Content?>(null) }
+    val media = variantPick ?: baseItem
+    val variants = remember(baseItem.key) { state.repo.variantsOf(baseItem) }
+    var showFormats by remember { mutableStateOf(false) }
     var engineName by remember { mutableStateOf(state.store.settings.engine) }
     var triedFallback by remember { mutableStateOf(false) }
     var overrideUrl by remember(s) { mutableStateOf(s.overrideUrl) }
@@ -324,7 +332,6 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                     Spacer(Modifier.weight(1f))
                     if (isLive) Badge("AO VIVO", Z.Live) else if (overrideUrl != null) Badge("REPLAY", Z.Cyan)
                     es.videoSize?.let { Badge(it) }
-                    Badge(engine.name)
                 }
 
                 // Barra inferior de vidro
@@ -339,12 +346,12 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                         if (media.kind == Kind.LIVE) ChannelLogo(media, 52.dp)
                         Column(Modifier.weight(1f)) {
                             val top = when (media.kind) {
-                                Kind.LIVE -> media.name
+                                Kind.LIVE -> media.title
                                 Kind.EPISODE -> "Temporada ${media.season} · Episódio ${media.episode}"
                                 else -> if (media.kind == Kind.MOVIE) "Filme" else ""
                             }
                             Text(top, style = MaterialTheme.typography.labelMedium, color = Z.Muted, maxLines = 1)
-                            val title = subtitle ?: if (media.kind == Kind.LIVE) nowProg?.title ?: media.name else media.name
+                            val title = subtitle ?: if (media.kind == Kind.LIVE) nowProg?.title ?: media.title else media.title
                             Text(title, style = MaterialTheme.typography.headlineMedium, color = Z.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         if (isLive && nextProg != null) {
@@ -408,6 +415,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                                 }
                             }, tint = Z.Live, active = recording.isNotEmpty())
                         }
+                        if (variants.size > 1) item { IconGlassButton(Icons.Outlined.HighQuality, "Formato: ${Variants.label(media.name)}", { showFormats = true }) }
                         item { IconGlassButton(Icons.Outlined.Subtitles, "Áudio e legendas", { showTracks = true }) }
                         item {
                             IconGlassButton(Icons.Outlined.AspectRatio, "Proporção: ${aspect.label}", {
@@ -453,7 +461,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             ChannelLogo(c, 36.dp)
                             Column {
-                                Text(c.name, style = MaterialTheme.typography.labelLarge, color = Z.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(c.title, style = MaterialTheme.typography.labelLarge, color = Z.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 if (now != null) Text(now.title, style = MaterialTheme.typography.labelMedium, color = Z.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
@@ -465,6 +473,29 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
     }
 
     if (showTracks) TracksDialog(engine) { showTracks = false }
+    if (showFormats) {
+        GlassDialog({ showFormats = false }) {
+            Text("Formato", style = MaterialTheme.typography.headlineMedium, color = Z.Text)
+            Text("A escolha vale para os próximos canais e filmes também.", color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
+            val fr = remember { FocusRequester() }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(variants) { v ->
+                    val sel = v.key == media.key
+                    com.zuvion.tv.ui.components.Chip(Variants.label(v.name), sel, {
+                        if (!sel) {
+                            saveProgress()
+                            startAt = if (media.kind == Kind.LIVE) 0 else engine.position
+                            variantPick = v
+                            triedFallback = false
+                            state.store.updateSettings { it.copy(preferredFormat = Variants.label(v.name)) }
+                        }
+                        showFormats = false
+                    }, if (sel) Modifier.focusRequester(fr) else Modifier)
+                }
+            }
+            LaunchedEffect(Unit) { kotlinx.coroutines.delay(80); runCatching { fr.requestFocus() } }
+        }
+    }
     if (showInfo) SynopsisDialog(state, media, if (isLive) nowProg else null, if (isLive) nextProg else null, subtitle) { showInfo = false }
 }
 
@@ -480,9 +511,9 @@ private fun SynopsisDialog(state: AppState, media: Content, now: EpgProgram?, ne
     GlassDialog(onDismiss) {
         Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (media.kind == Kind.LIVE) {
-                Text(media.name.uppercase(), style = MaterialTheme.typography.labelSmall, color = Z.Cyan)
+                Text(media.title.uppercase(), style = MaterialTheme.typography.labelSmall, color = Z.Cyan)
                 if (now == null && replayTitle == null) {
-                    Text(media.name, style = MaterialTheme.typography.headlineMedium, color = Z.Text)
+                    Text(media.title, style = MaterialTheme.typography.headlineMedium, color = Z.Text)
                     Text("Este canal não tem guia de programação.", color = Z.Muted)
                 } else {
                     Text(replayTitle ?: now?.title.orEmpty(), style = MaterialTheme.typography.headlineMedium, color = Z.Text)
@@ -497,7 +528,7 @@ private fun SynopsisDialog(state: AppState, media: Content, now: EpgProgram?, ne
             } else {
                 val m = meta
                 Text(if (media.kind == Kind.EPISODE) "TEMPORADA ${media.season} · EPISÓDIO ${media.episode}" else "FILME", style = MaterialTheme.typography.labelSmall, color = Z.Cyan)
-                Text(m?.title?.takeIf { media.kind == Kind.MOVIE } ?: media.name, style = MaterialTheme.typography.headlineMedium, color = Z.Text)
+                Text(m?.title?.takeIf { media.kind == Kind.MOVIE } ?: media.title, style = MaterialTheme.typography.headlineMedium, color = Z.Text)
                 val info = listOfNotNull(m?.year ?: media.year, (m?.rating ?: media.rating)?.let { "★ $it" }, m?.imdbRating?.let { "IMDb $it" },
                     m?.runtime?.takeIf { it > 0 }?.let { "$it min" }).joinToString("  ·  ")
                 if (info.isNotBlank()) Text(info, color = Z.Muted, style = MaterialTheme.typography.labelLarge)

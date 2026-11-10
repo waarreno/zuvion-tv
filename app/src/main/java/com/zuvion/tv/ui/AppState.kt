@@ -2,12 +2,12 @@ package com.zuvion.tv.ui
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarViewWeek
-import androidx.compose.material.icons.outlined.FiberManualRecord
+import androidx.compose.material.icons.outlined.RadioButtonChecked
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LiveTv
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -26,9 +26,9 @@ enum class Tab(val label: String, val icon: ImageVector) {
     MOVIES("Filmes", Icons.Outlined.Movie),
     SERIES("Séries", Icons.Outlined.VideoLibrary),
     GUIDE("Guia", Icons.Outlined.CalendarViewWeek),
-    RECORDINGS("Gravações", Icons.Outlined.FiberManualRecord),
+    RECORDINGS("Gravações", Icons.Outlined.RadioButtonChecked),
     SEARCH("Buscar", Icons.Outlined.Search),
-    SETTINGS("Ajustes", Icons.Outlined.Tune)
+    SETTINGS("Configurações", Icons.Outlined.Settings)
 }
 
 sealed interface Screen {

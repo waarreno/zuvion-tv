@@ -24,5 +24,12 @@ class MainActivity : ComponentActivity() {
                 ZuvionTheme { Root(state) }
             }
         }
+        // Algumas Google TV desenham o realce de foco padrão do Android por cima do app.
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            findViewById<android.view.ViewGroup>(android.R.id.content)?.let { root ->
+                root.defaultFocusHighlightEnabled = false
+                (0 until root.childCount).forEach { root.getChildAt(it).defaultFocusHighlightEnabled = false }
+            }
+        }
     }
 }

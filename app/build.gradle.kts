@@ -24,6 +24,11 @@ android {
         versionCode = appVersionCode
         versionName = appVersionName
         buildConfigField("String", "GITHUB_REPO", "\"$githubRepo\"")
+        // Chaves padrão das APIs: vêm dos secrets do GitHub na compilação (nunca do código).
+        fun secret(name: String) = (System.getenv(name) ?: "").replace("\"", "")
+        buildConfigField("String", "TMDB_KEY", "\"${secret("ZUVION_TMDB_KEY")}\"")
+        buildConfigField("String", "OMDB_KEY", "\"${secret("ZUVION_OMDB_KEY")}\"")
+        buildConfigField("String", "INTRODB_KEY", "\"${secret("ZUVION_INTRODB_KEY")}\"")
         vectorDrawables { useSupportLibrary = true }
         // APK único para ARM 32 e 64 bits: cobre todos os celulares, TV boxes e Google TV.
         // (x86 ficaria com +42 MB e falta espaço para instalar em TVs com pouco armazenamento.)
@@ -68,7 +73,8 @@ android {
             "-opt-in=androidx.media3.common.util.UnstableApi",
             "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            "-opt-in=androidx.compose.ui.ExperimentalComposeUiApi"
+            "-opt-in=androidx.compose.ui.ExperimentalComposeUiApi",
+            "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi"
         )
     }
     buildFeatures {

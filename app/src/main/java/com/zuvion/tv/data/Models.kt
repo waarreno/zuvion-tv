@@ -111,7 +111,9 @@ data class Settings(
     val tmdbKey: String = "",
     val omdbKey: String = "",
     val introDbKey: String = "",
-    val autoSkipIntro: Boolean = false
+    val autoSkipIntro: Boolean = false,
+    /** Último formato escolhido no player ("Full HD", "4K · H.265"…). */
+    val preferredFormat: String? = null
 )
 
 @Serializable

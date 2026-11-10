@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -48,6 +49,15 @@ import com.zuvion.tv.ui.theme.LocalIsTv
 import com.zuvion.tv.ui.theme.Z
 import com.zuvion.tv.ui.theme.glass
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -70,15 +80,24 @@ private fun ToggleRow(label: String, value: Boolean, onChange: (Boolean) -> Unit
     }
 }
 
+/** Pix estático (BR Code) para doações. */
+private const val PIX_KEY = "ac6ffef1-a34a-4877-be9d-83cc7ee355d4"
+private const val PIX_CODE = "00020126580014br.gov.bcb.pix0136ac6ffef1-a34a-4877-be9d-83cc7ee355d45204000053039865802BR5916WARRENO HENDRICK6015APARECIDA DE GO62120508ZUVIONTV63043A12"
+
 @Composable
-private fun KeyRow(label: String, value: String, hint: String, onClick: () -> Unit) {
+private fun KeyRow(label: String, value: String, hint: String, builtIn: Boolean, onClick: () -> Unit) {
     Focusable(onClick, Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), glass = false, focusScale = 1.01f) {
         Row(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(label, color = Z.Text, style = MaterialTheme.typography.bodyLarge)
-                Text(if (value.isBlank()) "Não configurada · $hint" else "Configurada ••••" + value.takeLast(4), color = Z.Muted, style = MaterialTheme.typography.labelMedium)
+                Text(when {
+                    value.isNotBlank() -> "Sua chave ••••" + value.takeLast(4)
+                    builtIn -> "Ativa (chave do app) · toque para usar a sua"
+                    else -> "Não configurada · $hint"
+                }, color = Z.Muted, style = MaterialTheme.typography.labelMedium)
             }
-            Icon(if (value.isBlank()) Icons.Outlined.Add else Icons.Outlined.CheckCircle, null, tint = if (value.isBlank()) Z.Muted else Z.Cyan)
+            val ok = value.isNotBlank() || builtIn
+            Icon(if (ok) Icons.Outlined.CheckCircle else Icons.Outlined.Add, null, tint = if (ok) Z.Cyan else Z.Muted)
         }
     }
 }
@@ -104,7 +123,7 @@ fun SettingsScreen(state: AppState) {
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item { Text("Ajustes", style = MaterialTheme.typography.headlineMedium, color = Z.Text) }
+        item { Text("Configurações", style = MaterialTheme.typography.headlineMedium, color = Z.Text) }
 
         item {
             Section("Listas IPTV") {
@@ -129,7 +148,7 @@ fun SettingsScreen(state: AppState) {
                         }
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     PillButton("Atualizar lista agora", { state.repo.refresh() }, icon = Icons.Outlined.Refresh, primary = true)
                     PillButton("Adicionar lista", { state.push(Screen.Setup) }, icon = Icons.Outlined.Add)
                 }
@@ -138,7 +157,7 @@ fun SettingsScreen(state: AppState) {
                 }
                 Text("Última atualização: ${updated ?: "-"}", color = Z.Muted, style = MaterialTheme.typography.labelMedium)
                 Text("Atualizar automaticamente", color = Z.Muted, style = MaterialTheme.typography.labelLarge)
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     listOf(12 to "12 h", 24 to "24 h", 72 to "3 dias", 0 to "Só manual").forEach { (h, l) ->
                         Chip(l, s.refreshHours == h, { state.store.updateSettings { it.copy(refreshHours = h) } })
                     }
@@ -148,7 +167,7 @@ fun SettingsScreen(state: AppState) {
 
         item {
             Section("Aparência") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     listOf("system" to "Automático", "dark" to "Escuro", "light" to "Claro").forEach { (v, l) ->
                         Chip(l, s.theme == v, { state.store.updateSettings { it.copy(theme = v) } })
                     }
@@ -159,12 +178,13 @@ fun SettingsScreen(state: AppState) {
 
         item {
             Section("Capas e sinopses") {
-                Text("Com uma chave do TMDB, capas, sinopses e elenco vêm do TMDB; o servidor IPTV só é usado se o TMDB não encontrar. " +
-                    "O OMDb acrescenta notas do IMDb e Rotten Tomatoes. O TheIntroDB mostra o botão “Pular abertura” e funciona sem chave.",
+                Text("Capas, sinopses e elenco vêm do TMDB; o servidor IPTV só é usado se o TMDB não encontrar. " +
+                    "O OMDb acrescenta notas do IMDb e Rotten Tomatoes. O TheIntroDB mostra o botão “Pular abertura”. " +
+                    "O app já vem com chaves; se quiser, use as suas.",
                     color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
-                KeyRow("TMDB", s.tmdbKey, "themoviedb.org → Configurações → API") { keyEdit = "tmdb" }
-                KeyRow("OMDb", s.omdbKey, "omdbapi.com/apikey.aspx") { keyEdit = "omdb" }
-                KeyRow("TheIntroDB (opcional)", s.introDbKey, "theintrodb.org") { keyEdit = "intro" }
+                KeyRow("TMDB", s.tmdbKey, "themoviedb.org → Configurações → API", BuildConfig.TMDB_KEY.isNotEmpty()) { keyEdit = "tmdb" }
+                KeyRow("OMDb", s.omdbKey, "omdbapi.com/apikey.aspx", BuildConfig.OMDB_KEY.isNotEmpty()) { keyEdit = "omdb" }
+                KeyRow("TheIntroDB", s.introDbKey, "theintrodb.org", true) { keyEdit = "intro" }
                 ToggleRow("Pular aberturas automaticamente", s.autoSkipIntro) { v -> state.store.updateSettings { it.copy(autoSkipIntro = v) } }
             }
         }
@@ -179,13 +199,13 @@ fun SettingsScreen(state: AppState) {
         item {
             Section("Player") {
                 Text("Motor de vídeo padrão", color = Z.Muted, style = MaterialTheme.typography.labelLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Chip("ExoPlayer (leve)", s.engine == "exo", { state.store.updateSettings { it.copy(engine = "exo") } })
                     Chip("VLC (compatível)", s.engine == "vlc", { state.store.updateSettings { it.copy(engine = "vlc") } })
                 }
                 ToggleRow("Se o ExoPlayer falhar, tentar no VLC automaticamente", s.autoFallbackVlc) { v -> state.store.updateSettings { it.copy(autoFallbackVlc = v) } }
                 Text("Formato dos canais ao vivo (Xtream)", color = Z.Muted, style = MaterialTheme.typography.labelLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Chip("MPEG-TS", s.liveFormat == "ts", { if (s.liveFormat != "ts") { state.store.updateSettings { it.copy(liveFormat = "ts") }; state.repo.refresh() } })
                     Chip("HLS (m3u8)", s.liveFormat == "m3u8", { if (s.liveFormat != "m3u8") { state.store.updateSettings { it.copy(liveFormat = "m3u8") }; state.repo.refresh() } })
                 }
@@ -198,7 +218,7 @@ fun SettingsScreen(state: AppState) {
                 ToggleRow("Ocultar categorias adultas", s.hideAdult) { v ->
                     if (!v && s.parentalPin != null) pinDialog = "verify-unhide" else state.store.updateSettings { it.copy(hideAdult = v) }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (s.parentalPin == null) PillButton("Definir PIN", { pinDialog = "set" }, primary = true)
                     else {
                         PillButton("Alterar PIN", { pinDialog = "verify-change" })
@@ -216,6 +236,32 @@ fun SettingsScreen(state: AppState) {
         }
 
         item {
+            Section("Apoie o Zuvion TV") {
+                Text("O Zuvion TV é gratuito e sem anúncios. Se ele faz parte da sua rotina, considere apoiar com uma doação via Pix, de qualquer valor.",
+                    color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    val qr = remember { qrBitmap(PIX_CODE, 360) }
+                    Box(Modifier.background(Color.White, RoundedCornerShape(18.dp)).padding(10.dp)) {
+                        Image(qr, "QR Code Pix para doação", Modifier.size(if (tv) 170.dp else 150.dp), filterQuality = FilterQuality.None)
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Pix · chave aleatória", color = Z.Text, style = MaterialTheme.typography.titleMedium)
+                        Text(PIX_KEY, color = Z.Muted, style = MaterialTheme.typography.labelMedium)
+                        Text("Wárreno Hendrick", color = Z.Faint, style = MaterialTheme.typography.labelMedium)
+                        if (!tv) {
+                            val clip = LocalClipboardManager.current
+                            PillButton("Copiar Pix copia e cola", {
+                                clip.setText(AnnotatedString(PIX_CODE)); state.showToast("Código Pix copiado")
+                            }, icon = Icons.Outlined.ContentCopy, primary = true)
+                        } else {
+                            Text("Aponte a câmera do app do seu banco para o QR Code.", color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
             Section("Sobre") {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     Logo(48.dp)
@@ -224,7 +270,10 @@ fun SettingsScreen(state: AppState) {
                         Text("Sua TV, seu universo", color = Z.Muted, style = MaterialTheme.typography.labelMedium)
                     }
                 }
+                Text("Versão ${BuildConfig.VERSION_NAME}", color = Z.Muted, style = MaterialTheme.typography.labelMedium)
                 Text("O Zuvion TV é um player: não fornece canais nem conteúdo. Use apenas listas às quais você tem direito.", color = Z.Faint, style = MaterialTheme.typography.labelMedium)
+                Text("Capas e sinopses: TMDB, OMDb e TheIntroDB. Este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB.", color = Z.Faint, style = MaterialTheme.typography.labelMedium)
+                Text("© ${java.util.Calendar.getInstance().get(java.util.Calendar.YEAR).coerceAtLeast(2026)} Wárreno Hendrick. Todos os direitos reservados.", color = Z.Text, style = MaterialTheme.typography.labelLarge)
             }
         }
     }

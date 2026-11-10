@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -213,7 +214,7 @@ fun SetupScreen(state: AppState) {
                 Modifier.glass(RoundedCornerShape(28.dp)).padding(22.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     listOf(SourceType.XTREAM to "Xtream", SourceType.M3U_URL to "M3U", SourceType.STALKER to "MAC", SourceType.M3U_FILE to "Arquivo")
                         .forEach { (t, l) -> Chip(l, type == t, { type = t; errMsg = null }) }
                 }
@@ -240,7 +241,7 @@ fun SetupScreen(state: AppState) {
                 }
                 if (errMsg != null) Text(errMsg!!, color = Z.Live, style = MaterialTheme.typography.bodyMedium)
                 PillButton(if (loading) "Conectando…" else "Entrar", { if (!loading) submit() }, Modifier.fillMaxWidth(), icon = Icons.Outlined.Login, primary = true)
-                if (tv && type != SourceType.M3U_FILE) PillButton("Digitar pelo celular (QR Code)", { phone = true }, Modifier.fillMaxWidth(), icon = Icons.Outlined.QrCode2)
+                if (tv && !wide && type != SourceType.M3U_FILE) PillButton("Digitar pelo celular (QR Code)", { phone = true }, Modifier.fillMaxWidth(), icon = Icons.Outlined.QrCode2)
                 if (state.stack.size > 1) PillButton("Cancelar", { state.pop() }, Modifier.fillMaxWidth())
             }
         }
@@ -252,7 +253,8 @@ fun SetupScreen(state: AppState) {
                 if (wide) {
                     Spacer(Modifier.height(12.dp))
                     Text("Adicione sua lista IPTV: Xtream Codes, M3U, portal MAC ou um arquivo do aparelho.",
-                        color = Z.Muted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(340.dp))
+                        color = Z.Muted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(380.dp))
+                    if (tv) { Spacer(Modifier.height(14.dp)); PhoneQrCard("login", Modifier.width(420.dp)) }
                 }
             }
         }

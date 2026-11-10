@@ -23,7 +23,8 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.RadioButtonChecked
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.zuvion.tv.data.Content
 import com.zuvion.tv.data.Kind
+import com.zuvion.tv.data.title
 import com.zuvion.tv.ui.AppState
 import com.zuvion.tv.ui.Screen
 import com.zuvion.tv.ui.Tab
@@ -78,20 +80,31 @@ fun HomeScreen(state: AppState) {
             Text(lib.error ?: "", color = Z.Muted, modifier = Modifier.padding(24.dp))
             PillButton("Tentar de novo", { state.repo.refresh() }, primary = true)
             Spacer(Modifier.height(12.dp))
-            PillButton("Ajustes", { state.tab = Tab.SETTINGS })
+            PillButton("Configurações", { state.tab = Tab.SETTINGS })
         }
         return
     }
 
     val movies = lib.items[Kind.MOVIE].orEmpty()
     val series = lib.items[Kind.SERIES].orEmpty()
-    val recentMovies = remember(movies) { movies.sortedByDescending { it.added }.take(30) }
+    val recentMovies = remember(movies) { com.zuvion.tv.data.Variants.dedupe(movies.sortedByDescending { it.added }, state.store.settings.preferredFormat).take(30) }
     val recentSeries = remember(series) { series.sortedByDescending { it.added }.take(30) }
     val history = pd.history.filter { it.item.playlistId == pid }
     val cont = history.filter { it.item.kind != Kind.LIVE }
     val favChannels = pd.favorites.filter { it.playlistId == pid && it.kind == Kind.LIVE }
     val recentChannels = history.filter { it.item.kind == Kind.LIVE }.map { it.item }
     val favVod = pd.favorites.filter { it.playlistId == pid && it.kind != Kind.LIVE }
+    var removing by remember { mutableStateOf<Content?>(null) }
+    removing?.let { r ->
+        GlassDialog({ removing = null }) {
+            Text("Remover de Continuar assistindo?", style = MaterialTheme.typography.headlineMedium, color = Z.Text)
+            Text("“${r.title}” sai da lista e o progresso volta para o início.", color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
+            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                PillButton("Remover", { state.store.removeProgress(r); removing = null; state.showToast("Removido de Continuar assistindo") }, Modifier.weight(1f), primary = true)
+                PillButton("Cancelar", { removing = null }, Modifier.weight(1f))
+            }
+        }
+    }
     var hero by remember(recentMovies) { mutableStateOf(recentMovies.firstOrNull() ?: recentSeries.firstOrNull()) }
 
     LazyColumn(
@@ -103,8 +116,9 @@ fun HomeScreen(state: AppState) {
         hero?.let { h -> item { Hero(state, h) } }
         if (cont.isNotEmpty()) item {
             ShelfRow(cont, "Continuar assistindo") { e ->
-                WideCard(e.item.name, e.item.poster, { state.play(e.item) }, progress = e.fraction,
-                    subtitle = if (e.item.kind == Kind.EPISODE) "T${e.item.season} · E${e.item.episode}" else null)
+                WideCard(e.item.title, e.item.poster, { state.play(e.item) }, progress = e.fraction,
+                    subtitle = if (e.item.kind == Kind.EPISODE) "T${e.item.season} · E${e.item.episode}" else null,
+                    onLongClick = { removing = e.item })
             }
         }
         val channels = (favChannels + recentChannels).distinctBy { it.key }.take(20)
@@ -115,7 +129,7 @@ fun HomeScreen(state: AppState) {
                     androidx.compose.foundation.layout.Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         ChannelLogo(c, 44.dp)
                         Column {
-                            Text(c.name, style = MaterialTheme.typography.labelLarge, color = Z.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(c.title, style = MaterialTheme.typography.labelLarge, color = Z.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(now?.title?.let { "Agora: $it" } ?: "Ao vivo", style = MaterialTheme.typography.labelMedium, color = Z.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
@@ -159,13 +173,14 @@ private fun HomeHeader(state: AppState, multiProfile: Boolean) {
             Wordmark(22)
             if (tv) Text("Sua TV, seu universo", style = MaterialTheme.typography.labelMedium, color = Z.Muted)
         }
-        androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconGlassButton(Icons.Outlined.Refresh, "Atualizar lista", { state.repo.refresh() }, size = 44.dp)
+        androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(if (tv) 10.dp else 8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (!tv) {
-                IconGlassButton(Icons.Outlined.Search, "Buscar", { state.tab = Tab.SEARCH }, size = 44.dp)
-                IconGlassButton(Icons.Outlined.FiberManualRecord, "Gravações", { state.tab = Tab.RECORDINGS }, size = 44.dp)
-                IconGlassButton(Icons.Outlined.Tune, "Ajustes", { state.tab = Tab.SETTINGS }, size = 44.dp)
+                IconGlassButton(Icons.Outlined.Search, "Buscar", { state.tab = Tab.SEARCH }, size = 40.dp)
+                IconGlassButton(Icons.Outlined.RadioButtonChecked, "Gravações", { state.tab = Tab.RECORDINGS }, size = 40.dp)
+                IconGlassButton(Icons.Outlined.Settings, "Configurações", { state.tab = Tab.SETTINGS }, size = 40.dp)
             } else {
+                IconGlassButton(Icons.Outlined.Refresh, "Atualizar lista", { state.repo.refresh() }, size = 44.dp)
+                IconGlassButton(Icons.Outlined.Settings, "Configurações", { state.tab = Tab.SETTINGS }, size = 44.dp)
                 Clock()
             }
             if (profile != null) {
@@ -210,7 +225,7 @@ private fun Hero(state: AppState, item: Content) {
         androidx.compose.foundation.layout.Row(Modifier.fillMaxSize().padding(24.dp), verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(if (item.kind == Kind.SERIES) "EM DESTAQUE · SÉRIE" else "EM DESTAQUE · FILME", style = MaterialTheme.typography.labelSmall, color = Z.Cyan)
-                Text(m?.title?.ifBlank { null } ?: item.name, style = if (tv) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium, color = Z.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(m?.title?.ifBlank { null } ?: item.title, style = if (tv) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium, color = Z.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 val meta = listOfNotNull(m?.year ?: item.year, (m?.rating ?: item.rating)?.let { "★ $it" }, m?.genres?.firstOrNull()).joinToString("  ·  ")
                 if (meta.isNotBlank()) Text(meta, style = MaterialTheme.typography.bodyMedium, color = Z.Muted)
                 androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

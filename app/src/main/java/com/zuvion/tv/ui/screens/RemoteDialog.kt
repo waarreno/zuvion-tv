@@ -36,11 +36,38 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.zuvion.tv.remote.RemoteServer
 import com.zuvion.tv.ui.components.PillButton
 import com.zuvion.tv.ui.theme.Z
+import com.zuvion.tv.ui.theme.glass
 
 fun qrBitmap(text: String, size: Int = 360): ImageBitmap {
     val m = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, size, size, mapOf(EncodeHintType.MARGIN to 1))
     val px = IntArray(m.width * m.height) { i -> if (m[i % m.width, i / m.width]) 0xFF0B0D1F.toInt() else 0xFFFFFFFF.toInt() }
     return Bitmap.createBitmap(px, m.width, m.height, Bitmap.Config.ARGB_8888).asImageBitmap()
+}
+
+/** QR Code fixo na tela (login da TV): o servidor fica ligado enquanto o cartão aparece. */
+@Composable
+fun PhoneQrCard(mode: String, modifier: Modifier = Modifier) {
+    val ctx = LocalContext.current
+    var url by remember { mutableStateOf<String?>(null) }
+    DisposableEffect(Unit) {
+        url = RemoteServer.start(ctx.applicationContext, mode)
+        onDispose { if (url != null) RemoteServer.stop() }
+    }
+    val u = url ?: return
+    Row(
+        modifier.glass(RoundedCornerShape(26.dp)).padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically
+    ) {
+        val bmp = remember(u) { qrBitmap(u, 300) }
+        Box(Modifier.background(Color.White, RoundedCornerShape(16.dp)).padding(8.dp)) {
+            Image(bmp, "QR Code para digitar pelo celular", Modifier.size(132.dp), filterQuality = FilterQuality.None)
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Mais fácil pelo celular", style = MaterialTheme.typography.titleMedium, color = Z.Text)
+            Text("Escaneie com a câmera, preencha os dados no celular e a TV entra sozinha.", style = MaterialTheme.typography.bodyMedium, color = Z.Muted)
+            Text("Celular e TV na mesma rede Wi-Fi.", style = MaterialTheme.typography.labelMedium, color = Z.Faint)
+        }
+    }
 }
 
 /**

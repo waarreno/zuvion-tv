@@ -89,6 +89,9 @@ class Store(context: Context, private val scope: CoroutineScope) {
         pd.copy(history = (listOf(e) + pd.history.filterNot { it.item.key == c.key }).take(60))
     }
 
+    /** Tira do "Continuar assistindo" e zera o progresso. */
+    fun removeProgress(c: Content) = updateProfileData { pd -> pd.copy(history = pd.history.filterNot { it.item.key == c.key }) }
+
     fun progressOf(c: Content): HistoryEntry? = profileData().history.firstOrNull { it.item.key == c.key }
 
     fun addPlaylist(p: Playlist) = update {

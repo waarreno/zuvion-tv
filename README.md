@@ -29,13 +29,14 @@ Player IPTV gratuito para <b>celular</b> e <b>Android TV / Google TV</b>, com vi
 - **Funciona com a sua lista:** Xtream Codes, link M3U/M3U8, arquivo M3U do aparelho e portal MAC (Stalker).
 - **TV ao vivo, filmes e séries:** categorias, busca, favoritos e "continuar assistindo".
 - **Guia de programação (EPG)** em grade, com **replay** (assistir do início) quando o provedor oferece.
-- **Capas e sinopses do TMDB**, com notas do IMDb e do Rotten Tomatoes pelo OMDb (opcional).
+- **Capas e sinopses do TMDB**, com notas do IMDb e do Rotten Tomatoes pelo OMDb, já configurados.
 - **Pular abertura** em séries e filmes, pelo TheIntroDB.
 - **Perfis**, perfil infantil e **PIN** para conteúdo adulto.
 - **Multi-tela:** até 4 canais ao mesmo tempo.
 - **Gravação** do programa ao vivo.
 - **Tema claro ou escuro.**
 - **Digitar pelo celular:** na TV, um QR Code abre uma página no celular para digitar o login ou a busca, sem usar o controle.
+- **Um canal, vários formatos:** canais e filmes em SD, HD, Full HD e 4K aparecem uma vez só; o formato é escolhido no player e o app lembra a sua escolha.
 - **Abre rápido:** a lista fica salva no aparelho e é atualizada a cada 24 horas, ou quando você quiser.
 - **Atualizações automáticas:** o app avisa quando sai uma versão nova e só instala com a sua confirmação.
 
@@ -60,13 +61,13 @@ O mesmo APK funciona em celulares, tablets, TV boxes e Google TV com processador
 ## Primeiros passos
 
 1. Escolha o tipo da sua lista (Xtream, M3U, MAC ou Arquivo) e preencha os dados que o seu provedor enviou.
-   Na TV, toque em **Digitar pelo celular** e escaneie o QR Code para digitar pelo celular.
+   Na TV, escaneie o QR Code da tela de login com o celular e preencha tudo por lá.
 2. Na primeira vez, o app mostra o carregamento de **TV ao vivo, Filmes, Séries e Guia**. Depois disso, ele abre direto.
-3. Para atualizar a lista quando quiser, use o botão **↻** na tela inicial ou **Ajustes → Atualizar lista agora**.
+3. Para atualizar a lista quando quiser, use o botão **↻** na tela inicial ou **Configurações → Atualizar lista agora**.
 
-### Capas e sinopses (opcional)
+### Capas e sinopses
 
-Em **Ajustes → Capas e sinopses** você pode colocar chaves gratuitas:
+O app já vem pronto para buscar capas, sinopses e notas. Se preferir usar as suas próprias chaves (gratuitas), coloque-as em **Configurações → Capas e sinopses**:
 
 | Serviço | Para que serve | Onde conseguir |
 |---|---|---|
@@ -74,7 +75,6 @@ Em **Ajustes → Capas e sinopses** você pode colocar chaves gratuitas:
 | **OMDb** | Notas do IMDb e do Rotten Tomatoes | [omdbapi.com](https://www.omdbapi.com/apikey.aspx) |
 | **TheIntroDB** | Botão "Pular abertura". Funciona sem chave | [theintrodb.org](https://theintrodb.org) |
 
-Sem chaves, o app usa as capas e sinopses que vêm da sua lista.
 
 ## Controle remoto (TV)
 
@@ -85,14 +85,26 @@ Sem chaves, o app usa as capas e sinopses que vêm da sua lista.
 | ▶ | Avança 10 s (filmes e séries) |
 | OK | Mostra os controles · pula a abertura quando o botão aparece |
 | Segurar OK numa lista | Adiciona ou remove dos favoritos |
+| Segurar OK em "Continuar assistindo" | Remove da lista e zera o progresso |
 
 ## Dúvidas comuns
 
-**Um canal não abre.** Toque no botão de trocar o motor de vídeo (ExoPlayer ↔ VLC) no player. Em **Ajustes → Player** você também pode trocar o formato dos canais entre MPEG-TS e HLS.
+**Um canal não abre.** Toque no botão de trocar o motor de vídeo (ExoPlayer ↔ VLC) no player. Em **Configurações → Player** você também pode trocar o formato dos canais entre MPEG-TS e HLS.
 
-**O guia está vazio.** Nem todo provedor envia o guia. Em **Ajustes → Listas IPTV → EPG**, você pode informar uma URL XMLTV própria.
+**O guia está vazio.** Nem todo provedor envia o guia. Em **Configurações → Listas IPTV → EPG**, você pode informar uma URL XMLTV própria.
 
 **A lista não mudou depois que o provedor adicionou canais.** Use **Atualizar lista agora**.
+
+## Apoie o projeto
+
+O Zuvion TV é gratuito e sem anúncios. Se ele faz parte da sua rotina, considere apoiar com uma doação via **Pix**, de qualquer valor:
+
+<p><img src="docs/pix.png" alt="QR Code Pix para doação" width="220"></p>
+
+**Chave Pix (aleatória):** `ac6ffef1-a34a-4877-be9d-83cc7ee355d4`
+Recebedor: Wárreno Hendrick
+
+O QR Code também aparece no app, em **Configurações → Apoie o Zuvion TV**.
 
 ## Privacidade
 
@@ -107,5 +119,7 @@ gradle :app:assembleDebug
 ```
 
 Requer JDK 17 e Android SDK 35. Cada tag `vX.Y.Z` gera um Release assinado pelo GitHub Actions, com as notas de `release-notes/X.Y.Z.md`.
+
+© 2026 Wárreno Hendrick. Todos os direitos reservados.
 
 Fontes Inter e Sora sob a SIL Open Font License. Metadados fornecidos pelo TMDB; este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB.
