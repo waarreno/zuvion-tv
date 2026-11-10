@@ -25,6 +25,8 @@ class ZuvionApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        // Remove o APK de atualização já instalado (libera espaço em TVs com pouco armazenamento).
+        runCatching { cacheDir.resolve("updates").deleteRecursively() }
         store = Store(this, scope)
         store.ensureDefaultProfile()
         epg = EpgRepository(this)

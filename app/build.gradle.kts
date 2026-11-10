@@ -25,6 +25,9 @@ android {
         versionName = appVersionName
         buildConfigField("String", "GITHUB_REPO", "\"$githubRepo\"")
         vectorDrawables { useSupportLibrary = true }
+        // APK único para ARM 32 e 64 bits: cobre todos os celulares, TV boxes e Google TV.
+        // (x86 ficaria com +42 MB e falta espaço para instalar em TVs com pouco armazenamento.)
+        ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
     }
 
     signingConfigs {

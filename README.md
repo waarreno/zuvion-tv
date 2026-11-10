@@ -55,7 +55,7 @@ Player IPTV gratuito para <b>celular</b> e <b>Android TV / Google TV</b>, com vi
 
 Se preferir, copie o APK para um pendrive e abra-o com um gerenciador de arquivos na TV.
 
-O mesmo APK funciona em celulares, tablets, TV boxes e Google TV, de Android 5.0 em diante.
+O mesmo APK funciona em celulares, tablets, TV boxes e Google TV com processador ARM (32 ou 64 bits, ou seja, praticamente todos), de Android 5.0 em diante. Para instalar, deixe pelo menos uns 600 MB livres na TV: o Android reserva parte do armazenamento e recusa a instalação com "App não instalado" quando falta espaço.
 
 ## Primeiros passos
 
