@@ -46,12 +46,14 @@ object RemoteServer {
         if (server == null) {
             page = context.assets.open("remote.html").bufferedReader().use { it.readText() }
             token = ByteArray(9).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
-            val s = ServerSocket()
-            s.reuseAddress = true
-            val port = (8686..8696).firstOrNull { p -> runCatching { s.bind(InetSocketAddress(p)); true }.getOrDefault(false) } ?: return null
+            var bound: ServerSocket? = null
+            for (p in 8686..8696) {
+                bound = runCatching { ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(p)) } }.getOrNull()
+                if (bound != null) { portUsed = p; break }
+            }
+            val s = bound ?: return null
             server = s
             pool.execute { acceptLoop(s) }
-            portUsed = port
         }
         users++
         return "http://$ip:$portUsed/?t=$token&m=$mode"

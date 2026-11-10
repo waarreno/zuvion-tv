@@ -148,8 +148,8 @@ fun Logo(size: Dp = 44.dp, modifier: Modifier = Modifier) {
 @Composable
 fun Wordmark(fontSize: Int = 22) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Zuvion ", fontSize = fontSize.sp, fontWeight = FontWeight.Bold, color = Z.Text)
-        Text("TV", fontSize = fontSize.sp, fontWeight = FontWeight.Bold, color = Z.Violet)
+        Text("Zuvion ", fontSize = fontSize.sp, fontWeight = FontWeight.SemiBold, fontFamily = com.zuvion.tv.ui.theme.Sora, color = Z.Text)
+        Text("TV", fontSize = fontSize.sp, fontWeight = FontWeight.SemiBold, fontFamily = com.zuvion.tv.ui.theme.Sora, color = Z.Violet)
     }
 }
 
