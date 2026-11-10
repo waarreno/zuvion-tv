@@ -25,6 +25,9 @@ class ZuvionApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        // A tela de erro roda em processo próprio e não precisa do resto do app.
+        if (CrashActivity.isCrashProcess(this)) return
+        CrashActivity.install(this)
         // Remove o APK de atualização já instalado (libera espaço em TVs com pouco armazenamento).
         runCatching { cacheDir.resolve("updates").deleteRecursively() }
         store = Store(this, scope)

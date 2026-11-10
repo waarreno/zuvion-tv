@@ -36,17 +36,22 @@ object Variants {
     fun displayName(name: String): String {
         var t = name
         listOf(qualityRx, codecRx, h264Rx, extraRx, legRx, dubRx).forEach { t = t.replace(it, " ") }
-        t = t.replace(Regex("""\[\s*]|\(\s*\)|\{\s*}"""), " ")
-            .replace(Regex("""\s*[|\-–:]\s*$"""), "")
-            .replace(Regex("""\s+"""), " ").trim()
+        t = t.replace(emptyBracketsRx, " ").replace(trailingSepRx, "").replace(spacesRx, " ").trim()
         return t.ifEmpty { name.trim() }
     }
+
+    // Atenção: o Android usa o motor ICU, que exige "}" e "]" escapados (o Java do PC não exige).
+    private val emptyBracketsRx = Regex("""\[\s*\]|\(\s*\)|\{\s*\}""")
+    private val trailingSepRx = Regex("""\s*[|\-–:]\s*$""")
+    private val spacesRx = Regex("""\s+""")
+    private val marksRx = Regex("\\p{M}")
+    private val nonAlnumRx = Regex("[^a-z0-9]+")
 
     /** Chave do grupo: nome sem formato, sem acentos/pontuação. */
     fun key(c: Content): String {
         val n = java.text.Normalizer.normalize(displayName(c.name).lowercase(), java.text.Normalizer.Form.NFD)
-            .replace(Regex("\\p{M}"), "")
-            .replace(Regex("[^a-z0-9]+"), " ").trim()
+            .replace(marksRx, "")
+            .replace(nonAlnumRx, " ").trim()
         return "${c.kind}|$n"
     }
 
