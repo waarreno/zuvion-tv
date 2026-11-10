@@ -22,6 +22,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Login
+import androidx.compose.material.icons.outlined.QrCode2
+import androidx.compose.runtime.LaunchedEffect
+import com.zuvion.tv.remote.RemoteEvent
+import com.zuvion.tv.remote.RemoteServer
+import com.zuvion.tv.ui.theme.LocalIsTv
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -36,6 +41,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -65,22 +79,40 @@ import kotlin.random.Random
 fun GlassField(
     label: String, value: String, onChange: (String) -> Unit,
     modifier: Modifier = Modifier, password: Boolean = false, placeholder: String = "",
-    keyboard: KeyboardType = KeyboardType.Text
+    keyboard: KeyboardType = KeyboardType.Text,
+    last: Boolean = false,
+    onDone: (() -> Unit)? = null
 ) {
+    val focus = LocalFocusManager.current
     OutlinedTextField(
         value = value, onValueChange = onChange, label = { Text(label) },
         placeholder = { Text(placeholder, color = Z.Faint) },
         singleLine = true,
         visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-        keyboardOptions = KeyboardOptions(keyboardType = if (password) KeyboardType.Password else keyboard),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = if (password && keyboard == KeyboardType.Text) KeyboardType.Password else keyboard,
+            imeAction = if (last) ImeAction.Done else ImeAction.Next
+        ),
+        keyboardActions = KeyboardActions(
+            onNext = { focus.moveFocus(FocusDirection.Down) },
+            onDone = { focus.clearFocus(); onDone?.invoke() }
+        ),
         shape = RoundedCornerShape(16.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Z.Violet, unfocusedBorderColor = Color.White.copy(alpha = 0.18f),
-            focusedContainerColor = Color.White.copy(alpha = 0.08f), unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
+            focusedBorderColor = Z.Violet, unfocusedBorderColor = Z.Tint.copy(alpha = 0.18f),
+            focusedContainerColor = Z.Tint.copy(alpha = 0.08f), unfocusedContainerColor = Z.Tint.copy(alpha = 0.05f),
             focusedLabelColor = Z.Violet, unfocusedLabelColor = Z.Muted, cursorColor = Z.Violet,
             focusedTextColor = Z.Text, unfocusedTextColor = Z.Text
         ),
-        modifier = modifier.fillMaxWidth()
+        // No controle remoto, ▲/▼ saem do campo (alguns Google TV prendem o foco no texto).
+        modifier = modifier.fillMaxWidth().onPreviewKeyEvent { ev ->
+            if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (ev.key) {
+                Key.DirectionDown -> focus.moveFocus(FocusDirection.Down)
+                Key.DirectionUp -> focus.moveFocus(FocusDirection.Up)
+                else -> false
+            }
+        }
     )
 }
 
@@ -101,6 +133,8 @@ fun SetupScreen(state: AppState) {
     var loading by remember { mutableStateOf(false) }
     var errMsg by remember { mutableStateOf<String?>(null) }
     val id = remember { UUID.randomUUID().toString() }
+    val tv = LocalIsTv.current
+    var phone by remember { mutableStateOf(false) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri != null) scope.launch {
@@ -154,6 +188,24 @@ fun SetupScreen(state: AppState) {
         }
     }
 
+    // Dados digitados no celular (QR Code): preenche e já tenta entrar.
+    LaunchedEffect(Unit) {
+        RemoteServer.events.collect { ev ->
+            if (ev !is RemoteEvent.Login || loading) return@collect
+            val f = ev.fields
+            type = runCatching { SourceType.valueOf(f["type"].orEmpty()) }.getOrDefault(SourceType.XTREAM)
+            f["name"]?.takeIf { it.isNotBlank() }?.let { name = it }
+            url = f["url"].orEmpty().trim()
+            user = f["user"].orEmpty().trim()
+            pass = f["pass"].orEmpty().trim()
+            f["mac"]?.trim()?.uppercase()?.takeIf { it.length >= 17 }?.let { mac = it }
+            epg = f["epg"].orEmpty().trim()
+            phone = false
+            submit()
+        }
+    }
+    if (phone) PhoneRemoteDialog("login") { phone = false }
+
     BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
         val wide = maxWidth > 760.dp
         val form: @Composable () -> Unit = {
@@ -170,7 +222,7 @@ fun SetupScreen(state: AppState) {
                     SourceType.XTREAM -> {
                         GlassField("Servidor (URL)", url, { url = it }, placeholder = "http://servidor:porta", keyboard = KeyboardType.Uri)
                         GlassField("Usuário", user, { user = it })
-                        GlassField("Senha", pass, { pass = it }, password = true)
+                        GlassField("Senha", pass, { pass = it }, password = true, last = true, onDone = { submit() })
                     }
                     SourceType.M3U_URL -> {
                         GlassField("URL da lista M3U", url, { url = it }, placeholder = "http://…/lista.m3u", keyboard = KeyboardType.Uri)
@@ -188,6 +240,7 @@ fun SetupScreen(state: AppState) {
                 }
                 if (errMsg != null) Text(errMsg!!, color = Z.Live, style = MaterialTheme.typography.bodyMedium)
                 PillButton(if (loading) "Conectando…" else "Entrar", { if (!loading) submit() }, Modifier.fillMaxWidth(), icon = Icons.Outlined.Login, primary = true)
+                if (tv && type != SourceType.M3U_FILE) PillButton("Digitar pelo celular (QR Code)", { phone = true }, Modifier.fillMaxWidth(), icon = Icons.Outlined.QrCode2)
                 if (state.stack.size > 1) PillButton("Cancelar", { state.pop() }, Modifier.fillMaxWidth())
             }
         }

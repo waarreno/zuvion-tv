@@ -51,7 +51,7 @@ fun GlassDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
         Box(Modifier.fillMaxSize().background(Color(0x99040610)), contentAlignment = Alignment.Center) {
             Column(
                 Modifier.padding(24.dp).widthIn(max = 560.dp).fillMaxWidth()
-                    .background(Color(0xE6101429), RoundedCornerShape(32.dp))
+                    .background(Z.Panel, RoundedCornerShape(32.dp))
                     .glass(RoundedCornerShape(32.dp), strong = true)
                     .padding(28.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -115,7 +115,7 @@ fun UpdateDialog(state: AppState, upd: UpdateState) {
             is UpdateState.Available -> {
                 if (upd.info.notes.isNotBlank()) {
                     Column(
-                        Modifier.fillMaxWidth().heightIn(max = 220.dp).background(Color.White.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
+                        Modifier.fillMaxWidth().heightIn(max = 220.dp).background(Z.Tint.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
                             .verticalScroll(rememberScrollState()).padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {

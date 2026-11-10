@@ -19,6 +19,9 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FiberManualRecord
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Stop
+import androidx.compose.material.icons.outlined.QrCode2
+import com.zuvion.tv.remote.RemoteEvent
+import com.zuvion.tv.remote.RemoteServer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -66,7 +69,7 @@ fun RecordingsScreen(state: AppState) {
     val fmt = remember { SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()) }
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = if (tv) 24.dp else 110.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item { Text("Gravações", style = MaterialTheme.typography.headlineMedium, color = Z.Text) }
@@ -106,16 +109,24 @@ fun SearchScreen(state: AppState) {
     var q by remember { mutableStateOf("") }
     val results = remember(q) { state.repo.search(q) }
     val fr = remember { FocusRequester() }
+    var phone by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { if (!tv) runCatching { fr.requestFocus() } }
+    LaunchedEffect(Unit) {
+        RemoteServer.events.collect { ev -> if (ev is RemoteEvent.Search) { q = ev.text; if (ev.final) phone = false } }
+    }
+    if (phone) PhoneRemoteDialog("search") { phone = false }
     Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Buscar", style = MaterialTheme.typography.headlineMedium, color = Z.Text)
-        GlassField("Canal, filme ou série", q, { q = it }, Modifier.focusRequester(fr))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            GlassField("Canal, filme ou série", q, { q = it }, Modifier.weight(1f).focusRequester(fr), last = true)
+            if (tv) PillButton("Digitar pelo celular", { phone = true }, icon = Icons.Outlined.QrCode2)
+        }
         if (q.length >= 2 && results.isEmpty()) EmptyView("Nada encontrado para “$q”.")
         val channels = results.filter { it.kind == Kind.LIVE }
         val vod = results.filter { it.kind != Kind.LIVE }
         LazyVerticalGrid(
             GridCells.Adaptive(if (tv) 150.dp else 110.dp),
-            contentPadding = PaddingValues(bottom = if (tv) 24.dp else 110.dp, top = 4.dp),
+            contentPadding = PaddingValues(bottom = 24.dp, top = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {

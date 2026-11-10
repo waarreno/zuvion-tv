@@ -39,10 +39,8 @@ jobs:
           V="${GITHUB_REF_NAME#v}"
           gradle :app:assembleRelease -PversionName="$V" -PgithubRepo="$GITHUB_REPOSITORY" --no-daemon --stacktrace
           mkdir -p out
-          for f in app/build/outputs/apk/release/*.apk; do
-            abi=$(basename "$f" .apk | sed -e 's/^app-//' -e 's/-release$//')
-            cp "$f" "out/ZuvionTV-$V-$abi.apk"
-          done
+          # Um único APK universal: serve para celular, TV e todas as arquiteturas.
+          cp app/build/outputs/apk/release/app-release.apk "out/ZuvionTV-$V-universal.apk"
           ls -la out
 
       - name: Publicar Release

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.outlined.FiberManualRecord
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -29,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -74,7 +76,7 @@ fun HomeScreen(state: AppState) {
     if (lib.error != null) {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             Text(lib.error ?: "", color = Z.Muted, modifier = Modifier.padding(24.dp))
-            PillButton("Tentar de novo", { state.repo.reload() }, primary = true)
+            PillButton("Tentar de novo", { state.repo.refresh() }, primary = true)
             Spacer(Modifier.height(12.dp))
             PillButton("Ajustes", { state.tab = Tab.SETTINGS })
         }
@@ -94,7 +96,7 @@ fun HomeScreen(state: AppState) {
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = if (tv) 40.dp else 110.dp),
+        contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(26.dp)
     ) {
         item { HomeHeader(state, data.profiles.size > 1) }
@@ -158,6 +160,7 @@ private fun HomeHeader(state: AppState, multiProfile: Boolean) {
             if (tv) Text("Sua TV, seu universo", style = MaterialTheme.typography.labelMedium, color = Z.Muted)
         }
         androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconGlassButton(Icons.Outlined.Refresh, "Atualizar lista", { state.repo.refresh() }, size = 44.dp)
             if (!tv) {
                 IconGlassButton(Icons.Outlined.Search, "Buscar", { state.tab = Tab.SEARCH }, size = 44.dp)
                 IconGlassButton(Icons.Outlined.FiberManualRecord, "Gravações", { state.tab = Tab.RECORDINGS }, size = 44.dp)
@@ -186,32 +189,37 @@ fun Clock() {
 @Composable
 private fun Hero(state: AppState, item: Content) {
     val tv = LocalIsTv.current
+    val m by produceState(state.meta.cached(item), item.key) { value = state.meta.forContent(item) }
+    val poster = m?.poster ?: item.poster
+    val backdrop = m?.backdrop
     Box(
         Modifier
             .padding(horizontal = if (tv) 28.dp else 16.dp)
             .fillMaxWidth()
             .height(if (tv) 300.dp else 230.dp)
             .clip(RoundedCornerShape(30.dp))
-            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(30.dp))
+            .background(Z.Tint.copy(alpha = 0.04f), RoundedCornerShape(30.dp))
     ) {
-        if (!item.poster.isNullOrBlank()) {
-            AsyncImage(item.poster, null, contentScale = ContentScale.Crop,
+        if (backdrop != null) {
+            AsyncImage(backdrop, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().alpha(0.8f))
+        } else if (!poster.isNullOrBlank()) {
+            AsyncImage(poster, null, contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().blur(28.dp).alpha(0.55f))
         }
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Z.Space.copy(alpha = 0.92f), Color.Transparent))))
         androidx.compose.foundation.layout.Row(Modifier.fillMaxSize().padding(24.dp), verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(if (item.kind == Kind.SERIES) "EM DESTAQUE · SÉRIE" else "EM DESTAQUE · FILME", style = MaterialTheme.typography.labelSmall, color = Z.Cyan)
-                Text(item.name, style = if (tv) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium, color = Z.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                val meta = listOfNotNull(item.year, item.rating?.let { "★ $it" }).joinToString("  ·  ")
+                Text(m?.title?.ifBlank { null } ?: item.name, style = if (tv) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium, color = Z.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                val meta = listOfNotNull(m?.year ?: item.year, (m?.rating ?: item.rating)?.let { "★ $it" }, m?.genres?.firstOrNull()).joinToString("  ·  ")
                 if (meta.isNotBlank()) Text(meta, style = MaterialTheme.typography.bodyMedium, color = Z.Muted)
                 androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     PillButton("Assistir", { if (item.kind == Kind.MOVIE) state.play(item) else state.open(item) }, icon = Icons.Outlined.PlayArrow, primary = true)
                     PillButton("Detalhes", { state.open(item) }, icon = Icons.Outlined.Info)
                 }
             }
-            if (tv && !item.poster.isNullOrBlank()) {
-                AsyncImage(item.poster, null, contentScale = ContentScale.Crop,
+            if (tv && !poster.isNullOrBlank()) {
+                AsyncImage(poster, null, contentScale = ContentScale.Crop,
                     modifier = Modifier.padding(start = 24.dp).width(170.dp).height(250.dp).clip(RoundedCornerShape(18.dp)).background(Color.Black))
             }
         }

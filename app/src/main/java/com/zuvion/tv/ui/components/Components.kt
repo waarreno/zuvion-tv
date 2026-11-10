@@ -50,6 +50,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.platform.LocalContext
+import com.zuvion.tv.ZuvionApp
 import com.zuvion.tv.data.Content
 import com.zuvion.tv.ui.theme.Z
 import com.zuvion.tv.ui.theme.glass
@@ -68,6 +71,7 @@ fun Focusable(
     glass: Boolean = true,
     selected: Boolean = false,
     onFocus: (() -> Unit)? = null,
+    fill: Color? = null,
     content: @Composable BoxScope.(focused: Boolean) -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -78,7 +82,8 @@ fun Focusable(
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .then(if (focused) Modifier.shadow(24.dp, shape, ambientColor = Z.Violet, spotColor = Z.Violet) else Modifier)
             .then(if (glass) Modifier.glass(shape, strong = selected) else Modifier.clip(shape))
-            .then(if (focused) Modifier.border(3.dp, Color.White, shape) else Modifier)
+            .then(if (fill != null) Modifier.background(fill) else Modifier)
+            .then(if (focused) Modifier.border(3.dp, Z.Focus, shape) else Modifier)
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocus?.invoke()
@@ -102,15 +107,13 @@ fun PillButton(
     primary: Boolean = false,
     onFocus: (() -> Unit)? = null
 ) {
-    Focusable(onClick, modifier, CircleShape, glass = !primary, onFocus = onFocus) { f ->
+    Focusable(onClick, modifier, CircleShape, glass = !primary, onFocus = onFocus, fill = if (primary) Z.Primary else null) { f ->
         Row(
-            Modifier
-                .then(if (primary) Modifier.background(Color.White.copy(alpha = 0.94f)) else Modifier)
-                .padding(horizontal = 22.dp, vertical = 12.dp),
+            Modifier.align(Alignment.Center).padding(horizontal = 22.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            val c = if (primary) Z.Ink else Z.Text
+            val c = if (primary) Z.OnPrimary else Z.Text
             if (icon != null) Icon(icon, null, tint = c, modifier = Modifier.size(20.dp))
             Text(text, color = c, style = MaterialTheme.typography.labelLarge)
         }
@@ -131,13 +134,14 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 
 @Composable
 fun Logo(size: Dp = 44.dp, modifier: Modifier = Modifier) {
+    val ring = if (Z.dark) Color.White else Z.Violet
     Canvas(modifier.size(size)) {
         val s = this.size.width
         drawCircle(Brush.linearGradient(listOf(Z.Violet, Color(0xFF5BD8EE)), Offset.Zero, Offset(s, s)), radius = s * 0.25f)
         rotate(-24f) {
-            drawOval(Color.White.copy(alpha = 0.85f), topLeft = Offset(s * 0.05f, s * 0.34f), size = Size(s * 0.9f, s * 0.32f), style = Stroke(width = s * 0.036f))
+            drawOval(ring.copy(alpha = 0.85f), topLeft = Offset(s * 0.05f, s * 0.34f), size = Size(s * 0.9f, s * 0.32f), style = Stroke(width = s * 0.036f))
         }
-        drawCircle(Color.White, radius = s * 0.055f, center = Offset(s * 0.885f, s * 0.32f))
+        drawCircle(ring, radius = s * 0.055f, center = Offset(s * 0.885f, s * 0.32f))
     }
 }
 
@@ -162,12 +166,23 @@ fun Poster(url: String?, seed: String, modifier: Modifier = Modifier, label: Str
     }
 }
 
+/** Cartaz do TMDB quando há chave configurada; senão (ou se falhar), o do servidor. */
+@Composable
+fun rememberMetaPoster(item: Content): String? {
+    val app = LocalContext.current.applicationContext as ZuvionApp
+    val p by produceState(app.meta.cached(item)?.poster, item.key) {
+        if (app.meta.enabled) app.meta.forContent(item)?.poster?.let { value = it }
+    }
+    return p ?: item.poster
+}
+
 /** Cartaz vertical (filmes/séries). */
 @Composable
 fun PosterCard(item: Content, onClick: () -> Unit, modifier: Modifier = Modifier, width: Dp = 140.dp, progress: Float? = null, onLongClick: (() -> Unit)? = null, onFocus: (() -> Unit)? = null) {
+    val poster = rememberMetaPoster(item)
     Column(modifier.width(width), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Focusable(onClick, Modifier.fillMaxWidth().height(width * 1.48f), RoundedCornerShape(18.dp), onLongClick = onLongClick, onFocus = onFocus) {
-            Poster(item.poster, item.name, Modifier.fillMaxSize(), label = item.name)
+            Poster(poster, item.name, Modifier.fillMaxSize(), label = item.name)
             if (progress != null) ProgressLine(progress, Modifier.align(Alignment.BottomCenter).padding(8.dp))
         }
         Text(item.name, style = MaterialTheme.typography.labelMedium, color = Z.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -189,7 +204,7 @@ fun WideCard(title: String, image: String?, onClick: () -> Unit, modifier: Modif
 
 @Composable
 fun ProgressLine(fraction: Float, modifier: Modifier = Modifier, height: Dp = 4.dp) {
-    Box(modifier.fillMaxWidth().height(height).clip(CircleShape).background(Color.White.copy(alpha = 0.25f))) {
+    Box(modifier.fillMaxWidth().height(height).clip(CircleShape).background(Z.Tint.copy(alpha = 0.22f))) {
         Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(height).clip(CircleShape).background(Z.Accent))
     }
 }
@@ -210,15 +225,13 @@ fun ChannelLogo(item: Content, size: Dp = 44.dp) {
 
 @Composable
 fun Chip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, onFocus: (() -> Unit)? = null) {
-    Focusable(onClick, modifier, CircleShape, glass = !selected, focusScale = 1.06f, onFocus = onFocus) {
+    Focusable(onClick, modifier, CircleShape, glass = !selected, focusScale = 1.06f, onFocus = onFocus, fill = if (selected) Z.Primary else null) {
         Text(
             text,
             style = MaterialTheme.typography.labelLarge,
-            color = if (selected) Z.Ink else Z.Text,
+            color = if (selected) Z.OnPrimary else Z.Text,
             maxLines = 1,
-            modifier = Modifier
-                .then(if (selected) Modifier.background(Color.White.copy(alpha = 0.92f)) else Modifier)
-                .padding(horizontal = 18.dp, vertical = 10.dp)
+            modifier = Modifier.align(Alignment.Center).padding(horizontal = 18.dp, vertical = 10.dp)
         )
     }
 }

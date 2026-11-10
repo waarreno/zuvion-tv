@@ -1,6 +1,8 @@
 package com.zuvion.tv.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -46,6 +48,9 @@ import com.zuvion.tv.ui.theme.LocalIsTv
 import com.zuvion.tv.ui.theme.Z
 import com.zuvion.tv.ui.theme.glass
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
@@ -65,6 +70,19 @@ private fun ToggleRow(label: String, value: Boolean, onChange: (Boolean) -> Unit
     }
 }
 
+@Composable
+private fun KeyRow(label: String, value: String, hint: String, onClick: () -> Unit) {
+    Focusable(onClick, Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), glass = false, focusScale = 1.01f) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(label, color = Z.Text, style = MaterialTheme.typography.bodyLarge)
+                Text(if (value.isBlank()) "Não configurada · $hint" else "Configurada ••••" + value.takeLast(4), color = Z.Muted, style = MaterialTheme.typography.labelMedium)
+            }
+            Icon(if (value.isBlank()) Icons.Outlined.Add else Icons.Outlined.CheckCircle, null, tint = if (value.isBlank()) Z.Muted else Z.Cyan)
+        }
+    }
+}
+
 private fun typeLabel(p: Playlist) = when (p.type) {
     SourceType.XTREAM -> "Xtream"; SourceType.M3U_URL -> "M3U"; SourceType.M3U_FILE -> "Arquivo"; SourceType.STALKER -> "MAC"
 }
@@ -78,10 +96,12 @@ fun SettingsScreen(state: AppState) {
     var pinDialog by remember { mutableStateOf<String?>(null) } // "set" | "verify-remove" | "verify-change"
     var newPin by remember { mutableStateOf("") }
     var epgEdit by remember { mutableStateOf<Playlist?>(null) }
+    var keyEdit by remember { mutableStateOf<String?>(null) } // tmdb | omdb | intro
+    val lib by state.repo.library.collectAsState()
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = if (tv) 24.dp else 110.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item { Text("Ajustes", style = MaterialTheme.typography.headlineMedium, color = Z.Text) }
@@ -92,7 +112,7 @@ fun SettingsScreen(state: AppState) {
                     val active = p.id == (s.activePlaylistId ?: data.playlists.firstOrNull()?.id)
                     Focusable({
                         state.store.updateSettings { it.copy(activePlaylistId = p.id) }
-                        state.repo.reload(); state.showToast("Lista “${p.name}” ativada")
+                        state.repo.open(); state.showToast("Lista “${p.name}” ativada")
                     }, Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), glass = active, selected = active, focusScale = 1.01f) {
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             if (active) Icon(Icons.Outlined.CheckCircle, "Ativa", tint = Z.Cyan)
@@ -103,15 +123,49 @@ fun SettingsScreen(state: AppState) {
                             PillButton("EPG", { epgEdit = p })
                             IconGlassButton(Icons.Outlined.Delete, "Remover lista", {
                                 state.store.removePlaylist(p.id)
-                                if (state.store.data.value.playlists.isEmpty()) state.replaceAll(Screen.Setup) else state.repo.reload()
+                                state.repo.deleteCache(p.id)
+                                if (state.store.data.value.playlists.isEmpty()) state.replaceAll(Screen.Setup) else state.repo.open()
                             }, size = 44.dp)
                         }
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    PillButton("Adicionar lista", { state.push(Screen.Setup) }, icon = Icons.Outlined.Add, primary = true)
-                    PillButton("Recarregar", { state.repo.reload(); state.showToast("Recarregando…") }, icon = Icons.Outlined.Refresh)
+                    PillButton("Atualizar lista agora", { state.repo.refresh() }, icon = Icons.Outlined.Refresh, primary = true)
+                    PillButton("Adicionar lista", { state.push(Screen.Setup) }, icon = Icons.Outlined.Add)
                 }
+                val updated = lib.updatedAt.takeIf { it > 0 }?.let {
+                    SimpleDateFormat("dd/MM 'às' HH:mm", Locale.getDefault()).format(Date(it))
+                }
+                Text("Última atualização: ${updated ?: "-"}", color = Z.Muted, style = MaterialTheme.typography.labelMedium)
+                Text("Atualizar automaticamente", color = Z.Muted, style = MaterialTheme.typography.labelLarge)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(12 to "12 h", 24 to "24 h", 72 to "3 dias", 0 to "Só manual").forEach { (h, l) ->
+                        Chip(l, s.refreshHours == h, { state.store.updateSettings { it.copy(refreshHours = h) } })
+                    }
+                }
+            }
+        }
+
+        item {
+            Section("Aparência") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("system" to "Automático", "dark" to "Escuro", "light" to "Claro").forEach { (v, l) ->
+                        Chip(l, s.theme == v, { state.store.updateSettings { it.copy(theme = v) } })
+                    }
+                }
+                Text("Automático segue o tema do aparelho. O player fica sempre escuro.", color = Z.Muted, style = MaterialTheme.typography.labelMedium)
+            }
+        }
+
+        item {
+            Section("Capas e sinopses") {
+                Text("Com uma chave do TMDB, capas, sinopses e elenco vêm do TMDB; o servidor IPTV só é usado se o TMDB não encontrar. " +
+                    "O OMDb acrescenta notas do IMDb e Rotten Tomatoes. O TheIntroDB mostra o botão “Pular abertura” e funciona sem chave.",
+                    color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
+                KeyRow("TMDB", s.tmdbKey, "themoviedb.org → Configurações → API") { keyEdit = "tmdb" }
+                KeyRow("OMDb", s.omdbKey, "omdbapi.com/apikey.aspx") { keyEdit = "omdb" }
+                KeyRow("TheIntroDB (opcional)", s.introDbKey, "theintrodb.org") { keyEdit = "intro" }
+                ToggleRow("Pular aberturas automaticamente", s.autoSkipIntro) { v -> state.store.updateSettings { it.copy(autoSkipIntro = v) } }
             }
         }
 
@@ -132,8 +186,8 @@ fun SettingsScreen(state: AppState) {
                 ToggleRow("Se o ExoPlayer falhar, tentar no VLC automaticamente", s.autoFallbackVlc) { v -> state.store.updateSettings { it.copy(autoFallbackVlc = v) } }
                 Text("Formato dos canais ao vivo (Xtream)", color = Z.Muted, style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Chip("MPEG-TS", s.liveFormat == "ts", { state.store.updateSettings { it.copy(liveFormat = "ts") }; state.repo.reload() })
-                    Chip("HLS (m3u8)", s.liveFormat == "m3u8", { state.store.updateSettings { it.copy(liveFormat = "m3u8") }; state.repo.reload() })
+                    Chip("MPEG-TS", s.liveFormat == "ts", { if (s.liveFormat != "ts") { state.store.updateSettings { it.copy(liveFormat = "ts") }; state.repo.refresh() } })
+                    Chip("HLS (m3u8)", s.liveFormat == "m3u8", { if (s.liveFormat != "m3u8") { state.store.updateSettings { it.copy(liveFormat = "m3u8") }; state.repo.refresh() } })
                 }
             }
         }
@@ -201,6 +255,34 @@ fun SettingsScreen(state: AppState) {
         }
     }
 
+    keyEdit?.let { k ->
+        val (title, current) = when (k) {
+            "tmdb" -> "Chave do TMDB" to s.tmdbKey
+            "omdb" -> "Chave do OMDb" to s.omdbKey
+            else -> "Chave do TheIntroDB" to s.introDbKey
+        }
+        var v by remember(k) { mutableStateOf(current) }
+        GlassDialog({ keyEdit = null }) {
+            Text(title, style = MaterialTheme.typography.headlineMedium, color = Z.Text)
+            Text(when (k) {
+                "tmdb" -> "Aceita a “Chave da API” (v3) ou o “Token de leitura” (v4). Cadastro gratuito em themoviedb.org."
+                "omdb" -> "Chave gratuita em omdbapi.com (até 1.000 consultas por dia)."
+                else -> "Opcional: o TheIntroDB funciona sem chave."
+            }, color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
+            GlassField("Chave", v, { v = it.trim() }, last = true)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                PillButton("Salvar", {
+                    val value = v.trim()
+                    state.store.updateSettings {
+                        when (k) { "tmdb" -> it.copy(tmdbKey = value); "omdb" -> it.copy(omdbKey = value); else -> it.copy(introDbKey = value) }
+                    }
+                    keyEdit = null; state.showToast(if (value.isEmpty()) "Chave removida" else "Chave salva")
+                }, Modifier.weight(1f), primary = true)
+                if (current.isNotEmpty()) PillButton("Remover", { v = "" }, Modifier.weight(1f))
+            }
+        }
+    }
+
     epgEdit?.let { p ->
         var url by remember(p.id) { mutableStateOf(p.epgUrl) }
         GlassDialog({ epgEdit = null }) {
@@ -209,7 +291,7 @@ fun SettingsScreen(state: AppState) {
             GlassField("URL XMLTV (.xml ou .xml.gz)", url, { url = it })
             PillButton("Salvar", {
                 state.store.update { d -> d.copy(playlists = d.playlists.map { if (it.id == p.id) it.copy(epgUrl = url.trim()) else it }) }
-                epgEdit = null; state.repo.reload()
+                epgEdit = null; state.repo.refresh()
             }, Modifier.fillMaxWidth(), primary = true)
         }
     }

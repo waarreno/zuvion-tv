@@ -32,22 +32,29 @@ class EpgRepository(private val context: Context) {
 
     fun clear() { _programs.value = emptyMap(); loadedUrl = null; displayNames = emptyMap() }
 
-    suspend fun load(url: String?) = lock.withLock {
-        if (url.isNullOrBlank() || url == loadedUrl) return@withLock
+    /**
+     * Carrega o XMLTV. Retorna o número de canais com programação, 0 se não há URL
+     * ou -1 em caso de erro. [force] ignora o cache em disco.
+     */
+    suspend fun load(url: String?, force: Boolean = false): Int = lock.withLock {
+        if (url.isNullOrBlank()) return@withLock 0
+        if (url == loadedUrl && !force) return@withLock _programs.value.size
         _loading.value = true
         try {
-            val map = withContext(Dispatchers.IO) { parse(open(url)) }
+            val map = withContext(Dispatchers.IO) { parse(open(url, force)) }
             _programs.value = map
             loadedUrl = url
+            map.size
         } catch (_: Throwable) {
+            -1
         } finally {
             _loading.value = false
         }
     }
 
-    private fun open(url: String): InputStream {
+    private fun open(url: String, force: Boolean): InputStream {
         val cache = File(context.cacheDir, "epg_" + md5(url) + ".xml")
-        if (!cache.exists() || System.currentTimeMillis() - cache.lastModified() > 6 * 3600_000L) {
+        if (force || !cache.exists() || System.currentTimeMillis() - cache.lastModified() > 6 * 3600_000L) {
             val req = Request.Builder().url(url).header("User-Agent", Http.USER_AGENT).build()
             Http.streamClient.newCall(req).execute().use { r ->
                 if (!r.isSuccessful) error("EPG HTTP ${r.code}")

@@ -32,9 +32,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FiberManualRecord
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.produceState
+import com.zuvion.tv.data.EpgProgram
+import com.zuvion.tv.meta.SkipTimes
 import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.FiberManualRecord
 import androidx.compose.material.icons.outlined.FormatListBulleted
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.History
@@ -200,9 +207,27 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
     var bump by remember { mutableIntStateOf(0) }
     var showChannels by remember { mutableStateOf(false) }
     var showTracks by remember { mutableStateOf(false) }
+    var showInfo by remember { mutableStateOf(false) }
     val rootFr = remember { FocusRequester() }
     val playFr = remember { FocusRequester() }
-    val panelOpen = showChannels || showTracks
+    val panelOpen = showChannels || showTracks || showInfo
+
+    // Pular abertura / créditos (TheIntroDB)
+    val skip by produceState<SkipTimes?>(null, media.key) { value = state.meta.skipTimes(media) }
+    val sk = skip
+    val inIntro = sk != null && sk.introStart >= 0 && pos in sk.introStart until sk.introEnd - 1000
+    val creditsAt = sk?.creditsStart
+    val inCredits = creditsAt != null && media.kind == Kind.EPISODE && index < list.lastIndex && pos >= creditsAt && (dur == 0L || pos < dur - 3000)
+    var autoSkipped by remember(media.key) { mutableStateOf(false) }
+    LaunchedEffect(inIntro) {
+        if (inIntro && sk != null && !autoSkipped && state.store.settings.autoSkipIntro) {
+            autoSkipped = true; engine.seekTo(sk.introEnd); state.showToast("Abertura pulada")
+        }
+    }
+    fun doSkip() {
+        if (inIntro && sk != null) engine.seekTo(sk.introEnd)
+        else if (inCredits) { saveProgress(); state.store.saveProgress(media, dur, dur); index++ }
+    }
 
     LaunchedEffect(overlay, bump, panelOpen) {
         if (overlay && !panelOpen) { delay(6000); overlay = false }
@@ -236,11 +261,13 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                     AKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { engine.seekBy(30_000); true }
                     AKeyEvent.KEYCODE_MEDIA_REWIND -> { engine.seekBy(-30_000); true }
                     AKeyEvent.KEYCODE_BACK -> if (overlay && !panelOpen) { overlay = false; true } else false
-                    else -> if (!overlay) {
+                    else -> if (!overlay && !panelOpen && (inIntro || inCredits) &&
+                        (code == AKeyEvent.KEYCODE_DPAD_CENTER || code == AKeyEvent.KEYCODE_ENTER)) { doSkip(); true }
+                    else if (!overlay && !panelOpen) {
                         when (code) {
                             AKeyEvent.KEYCODE_DPAD_UP -> { if (isLive) zap(-1) else overlay = true; true }
                             AKeyEvent.KEYCODE_DPAD_DOWN -> { if (isLive) zap(1) else overlay = true; true }
-                            AKeyEvent.KEYCODE_DPAD_LEFT -> { if (isLive) { showChannels = true; overlay = true } else engine.seekBy(-10_000); true }
+                            AKeyEvent.KEYCODE_DPAD_LEFT -> { if (isLive) showChannels = true else engine.seekBy(-10_000); true }
                             AKeyEvent.KEYCODE_DPAD_RIGHT -> { if (!isLive) engine.seekBy(10_000) else overlay = true; true }
                             AKeyEvent.KEYCODE_DPAD_CENTER, AKeyEvent.KEYCODE_ENTER, AKeyEvent.KEYCODE_MENU -> { overlay = true; true }
                             else -> false
@@ -277,7 +304,16 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
             }
         }
 
-        AnimatedVisibility(overlay, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
+        // Pular abertura / próximo episódio (aparece mesmo com os controles escondidos)
+        AnimatedVisibility(
+            (inIntro || inCredits) && !showChannels, enter = fadeIn(), exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomEnd).safeDrawingPadding().padding(end = 32.dp, bottom = if (overlay) 230.dp else 40.dp)
+        ) {
+            PillButton(if (inIntro) "Pular abertura" else "Próximo episódio", { doSkip() },
+                icon = Icons.Outlined.SkipNext, primary = true)
+        }
+
+        AnimatedVisibility(overlay && !showChannels, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent, Color.Black.copy(alpha = 0.6f))))) {
                 // Topo
                 Row(
@@ -350,6 +386,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                             })
                         }
                         if (isLive && list.size > 1) item { IconGlassButton(Icons.Outlined.FormatListBulleted, "Canais", { showChannels = true }) }
+                        item { IconGlassButton(Icons.Outlined.Info, "Sinopse", { showInfo = true }) }
                         if (!isLive) item { IconGlassButton(Icons.Outlined.Replay10, "Voltar 10 segundos", { engine.seekBy(-10_000) }) }
                         item {
                             Focusable({ engine.togglePause() }, Modifier.size(64.dp).focusRequester(playFr), CircleShape, focusScale = 1.1f, glass = false) {
@@ -362,14 +399,14 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                         if (media.kind == Kind.EPISODE && index < list.lastIndex) item { IconGlassButton(Icons.Outlined.SkipNext, "Próximo episódio", { saveProgress(); index++ }) }
                         if (isLive) item {
                             val recording by RecordingService.active.collectAsState()
-                            IconGlassButton(Icons.Outlined.FiberManualRecord, "Gravar", {
+                            IconGlassButton(Icons.Filled.FiberManualRecord, if (recording.isNotEmpty()) "Parar gravação" else "Gravar", {
                                 if (recording.isNotEmpty()) { RecordingService.stopAll(ctx); state.showToast("Gravação encerrada") }
                                 else currentUrl?.let { u ->
                                     val minutes = nowProg?.let { ((it.end - System.currentTimeMillis()) / 60000).toInt() + 2 }?.coerceIn(5, 240) ?: 120
                                     RecordingService.start(ctx, u, nowProg?.title?.let { "${media.name} - $it" } ?: media.name, minutes)
                                     state.showToast("Gravando por $minutes min")
                                 }
-                            }, tint = if (recording.isNotEmpty()) Z.Live else Z.Text, active = recording.isNotEmpty())
+                            }, tint = Z.Live, active = recording.isNotEmpty())
                         }
                         item { IconGlassButton(Icons.Outlined.Subtitles, "Áudio e legendas", { showTracks = true }) }
                         item {
@@ -409,7 +446,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                 itemsIndexed(list) { i, c ->
                     val now = state.epg.nowNext(c).first
                     Focusable(
-                        { overrideUrl = null; subtitle = null; index = i; showChannels = false; overlay = true },
+                        { overrideUrl = null; subtitle = null; index = i; showChannels = false; overlay = true; bump++ },
                         Modifier.fillMaxWidth().then(if (i == index) Modifier.focusRequester(firstFr) else Modifier),
                         RoundedCornerShape(16.dp), glass = i == index, selected = i == index, focusScale = 1.02f
                     ) {
@@ -423,11 +460,55 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                     }
                 }
             }
-            androidx.activity.compose.BackHandler { showChannels = false }
+            androidx.activity.compose.BackHandler { showChannels = false; runCatching { rootFr.requestFocus() } }
         }
     }
 
     if (showTracks) TracksDialog(engine) { showTracks = false }
+    if (showInfo) SynopsisDialog(state, media, if (isLive) nowProg else null, if (isLive) nextProg else null, subtitle) { showInfo = false }
+}
+
+/** Sinopse do programa em exibição (ao vivo) ou do filme/episódio. */
+@Composable
+private fun SynopsisDialog(state: AppState, media: Content, now: EpgProgram?, next: EpgProgram?, replayTitle: String?, onDismiss: () -> Unit) {
+    val f = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+    val meta by produceState(state.meta.cached(media), media.key) {
+        if (media.kind == Kind.MOVIE) value = state.meta.forContent(media)
+    }
+    val fr = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
+    GlassDialog(onDismiss) {
+        Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (media.kind == Kind.LIVE) {
+                Text(media.name.uppercase(), style = MaterialTheme.typography.labelSmall, color = Z.Cyan)
+                if (now == null && replayTitle == null) {
+                    Text(media.name, style = MaterialTheme.typography.headlineMedium, color = Z.Text)
+                    Text("Este canal não tem guia de programação.", color = Z.Muted)
+                } else {
+                    Text(replayTitle ?: now?.title.orEmpty(), style = MaterialTheme.typography.headlineMedium, color = Z.Text)
+                    if (now != null && replayTitle == null) Text(f.format(Date(now.start)) + " – " + f.format(Date(now.end)), color = Z.Muted, style = MaterialTheme.typography.labelLarge)
+                    Text(now?.desc?.ifBlank { null } ?: "Sem sinopse para este programa.", color = Z.Text, style = MaterialTheme.typography.bodyLarge)
+                    if (next != null) {
+                        Text("A SEGUIR · " + f.format(Date(next.start)), style = MaterialTheme.typography.labelSmall, color = Z.Cyan, modifier = Modifier.padding(top = 8.dp))
+                        Text(next.title, style = MaterialTheme.typography.titleMedium, color = Z.Text)
+                        if (next.desc.isNotBlank()) Text(next.desc, color = Z.Muted, style = MaterialTheme.typography.bodyMedium, maxLines = 4)
+                    }
+                }
+            } else {
+                val m = meta
+                Text(if (media.kind == Kind.EPISODE) "TEMPORADA ${media.season} · EPISÓDIO ${media.episode}" else "FILME", style = MaterialTheme.typography.labelSmall, color = Z.Cyan)
+                Text(m?.title?.takeIf { media.kind == Kind.MOVIE } ?: media.name, style = MaterialTheme.typography.headlineMedium, color = Z.Text)
+                val info = listOfNotNull(m?.year ?: media.year, (m?.rating ?: media.rating)?.let { "★ $it" }, m?.imdbRating?.let { "IMDb $it" },
+                    m?.runtime?.takeIf { it > 0 }?.let { "$it min" }).joinToString("  ·  ")
+                if (info.isNotBlank()) Text(info, color = Z.Muted, style = MaterialTheme.typography.labelLarge)
+                val plot = m?.overview?.ifBlank { null } ?: media.plot?.ifBlank { null }
+                Text(plot ?: "Sinopse não disponível.", color = Z.Text, style = MaterialTheme.typography.bodyLarge)
+                val cast = m?.cast.orEmpty()
+                if (cast.isNotEmpty()) Text("Elenco: " + cast.joinToString(), color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        PillButton("Fechar", onDismiss, Modifier.fillMaxWidth().focusRequester(fr), primary = true)
+    }
 }
 
 @Composable

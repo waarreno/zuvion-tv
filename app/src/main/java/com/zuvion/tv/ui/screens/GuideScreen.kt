@@ -81,7 +81,7 @@ fun GuideScreen(state: AppState) {
         hScroll.scrollTo(px.toInt().coerceAtLeast(0))
     }
 
-    Column(Modifier.fillMaxSize().padding(top = 16.dp, end = if (tv) 20.dp else 0.dp, bottom = if (tv) 16.dp else 96.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().padding(top = 16.dp, end = if (tv) 20.dp else 0.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // Cabeçalho com programa em foco
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).glass(RoundedCornerShape(24.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -157,7 +157,7 @@ private fun GuideRow(
         }
         Row(Modifier.horizontalScroll(hScroll), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
             if (progs.isEmpty()) {
-                Box(Modifier.width(PER_MIN * 60 * 14).fillMaxHeight().background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(14.dp)).padding(12.dp)) {
+                Box(Modifier.width(PER_MIN * 60 * 14).fillMaxHeight().background(Z.Tint.copy(alpha = 0.04f), RoundedCornerShape(14.dp)).padding(12.dp)) {
                     Text("Sem informação", color = Z.Faint, style = MaterialTheme.typography.labelMedium)
                 }
             } else {
@@ -190,7 +190,7 @@ private fun GuideRow(
                             focusScale = 1.02f,
                             onFocus = { onFocusProg(p) }
                         ) {
-                            Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = if (past) 0.03f else 0.07f)))
+                            Box(Modifier.fillMaxSize().background(Z.Tint.copy(alpha = if (past) 0.03f else 0.07f)))
                             Column(Modifier.padding(horizontal = 10.dp).align(Alignment.CenterStart)) {
                                 Text(p.title, style = MaterialTheme.typography.labelLarge, color = if (past) Z.Muted else Z.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(p.start)), style = MaterialTheme.typography.labelMedium, color = Z.Faint, maxLines = 1)

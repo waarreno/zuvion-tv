@@ -1,6 +1,19 @@
 package com.zuvion.tv.ui
 
+import android.app.Activity
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import com.zuvion.tv.ui.screens.LoadProgressScreen
+import com.zuvion.tv.ui.screens.SplashScreen
+import kotlinx.coroutines.delay
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -56,6 +69,20 @@ import com.zuvion.tv.update.UpdateState
 
 @Composable
 fun Root(state: AppState) {
+    val data by state.store.data.collectAsState()
+    val sysDark = isSystemInDarkTheme()
+    val wantDark = when (data.settings.theme) { "dark" -> true; "light" -> false; else -> sysDark }
+    // O player fica sempre escuro (controles sobre o vídeo).
+    Z.dark = wantDark || state.current is Screen.Player || state.current is Screen.Multi
+    val view = LocalView.current
+    SideEffect {
+        (view.context as? Activity)?.window?.let { w ->
+            val c = WindowCompat.getInsetsController(w, view)
+            c.isAppearanceLightStatusBars = !Z.dark
+            c.isAppearanceLightNavigationBars = !Z.dark
+        }
+    }
+
     BackHandler(enabled = state.stack.size > 1 || state.tab != Tab.HOME) { state.pop() }
 
     // Verificação automática de atualização (no máximo a cada 6h).
@@ -68,6 +95,9 @@ fun Root(state: AppState) {
         }
     }
 
+    var splash by rememberSaveable { mutableStateOf(true) }
+    LaunchedEffect(Unit) { delay(2100); splash = false }
+
     SpaceBackground {
         when (val s = state.current) {
             Screen.Setup -> SetupScreen(state)
@@ -79,8 +109,22 @@ fun Root(state: AppState) {
             is Screen.Multi -> MultiScreen(state, s)
         }
 
+        // Progresso do carregamento da lista (TV ao vivo, Filmes, Séries, Guia).
+        val lib by state.repo.library.collectAsState()
+        var showProgress by remember { mutableStateOf(false) }
+        LaunchedEffect(lib.refreshing) {
+            if (lib.refreshing) showProgress = true
+            else if (showProgress) { delay(1300); showProgress = false }
+        }
+        val onMain = state.current == Screen.Main || state.current == Screen.Profiles
+        AnimatedVisibility(showProgress && onMain && lib.steps.isNotEmpty(), enter = fadeIn(), exit = fadeOut()) {
+            LoadProgressScreen(state, lib.steps)
+        }
+
         val upd by state.updater.state.collectAsState()
-        if (upd !is UpdateState.Idle && state.current !is Screen.Player) UpdateDialog(state, upd)
+        if (upd !is UpdateState.Idle && state.current !is Screen.Player && !splash) UpdateDialog(state, upd)
+
+        AnimatedVisibility(splash, enter = fadeIn(), exit = fadeOut(tween(450))) { SplashScreen() }
 
         AnimatedVisibility(
             visible = state.toast != null,
@@ -119,9 +163,10 @@ fun MainShell(state: AppState) {
             Box(Modifier.fillMaxSize().padding(start = 8.dp)) { TabContent(state) }
         }
     } else {
-        Box(Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxSize().statusBarsPadding()) { TabContent(state) }
-            BottomBar(state, Modifier.align(Alignment.BottomCenter))
+        // A barra fica abaixo do conteúdo (não sobrepõe cartazes nem listas).
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1f).fillMaxWidth().statusBarsPadding()) { TabContent(state) }
+            BottomBar(state, Modifier)
         }
     }
 }
@@ -151,7 +196,7 @@ private fun NavRail(state: AppState) {
                 selected = selected,
                 focusScale = 1.1f
             ) {
-                Icon(t.icon, t.label, tint = if (selected) Color.White else Z.Muted, modifier = Modifier.align(Alignment.Center).size(24.dp))
+                Icon(t.icon, t.label, tint = if (selected) Z.Text else Z.Muted, modifier = Modifier.align(Alignment.Center).size(24.dp))
             }
         }
     }
@@ -163,9 +208,9 @@ private fun BottomBar(state: AppState, modifier: Modifier) {
     Row(
         modifier
             .navigationBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 10.dp)
             .fillMaxWidth()
-            .height(66.dp)
+            .height(64.dp)
             .glass(CircleShape, strong = true)
             .padding(horizontal = 6.dp),
         horizontalArrangement = Arrangement.SpaceAround,
@@ -175,8 +220,8 @@ private fun BottomBar(state: AppState, modifier: Modifier) {
             val sel = state.tab == t
             Focusable({ state.tab = t }, Modifier.weight(1f).fillMaxHeight(), CircleShape, glass = false) {
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(t.icon, null, tint = if (sel) Color.White else Z.Muted, modifier = Modifier.size(22.dp))
-                    Text(t.label, style = MaterialTheme.typography.labelMedium, color = if (sel) Color.White else Z.Muted)
+                    Icon(t.icon, null, tint = if (sel) Z.Violet else Z.Muted, modifier = Modifier.size(22.dp))
+                    Text(t.label, style = MaterialTheme.typography.labelMedium, color = if (sel) Z.Text else Z.Muted)
                 }
             }
         }

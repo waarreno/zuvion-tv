@@ -4,22 +4,54 @@ import android.content.Context
 import com.zuvion.tv.source.IptvSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.protobuf.ProtoBuf
+import java.io.File
+
+enum class StepState { WAITING, LOADING, OK, FAILED }
+
+/** Etapa do carregamento mostrada na tela de progresso (TV ao vivo, Filmes, Séries, Guia). */
+data class LoadStep(val id: String, val label: String, val state: StepState = StepState.WAITING, val count: Int = 0)
 
 data class Library(
     val categories: Map<Kind, List<Category>> = emptyMap(),
     val items: Map<Kind, List<Content>> = emptyMap(),
     val loading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    /** Atualização pela rede em andamento (mostra a tela de progresso). */
+    val refreshing: Boolean = false,
+    val steps: List<LoadStep> = emptyList(),
+    val updatedAt: Long = 0
 )
 
-/** Mantém em memória o conteúdo da lista ativa. */
+@Serializable
+private class LibraryCache(
+    val live: List<Content> = emptyList(),
+    val movies: List<Content> = emptyList(),
+    val series: List<Content> = emptyList(),
+    val liveCats: List<Category> = emptyList(),
+    val movieCats: List<Category> = emptyList(),
+    val seriesCats: List<Category> = emptyList(),
+    val savedAt: Long = 0
+)
+
+/**
+ * Mantém em memória o conteúdo da lista ativa.
+ * A lista fica em cache no aparelho e só é baixada de novo periodicamente
+ * (Ajustes → intervalo) ou quando o usuário pede.
+ */
+@OptIn(ExperimentalSerializationApi::class)
 class ContentRepository(
     private val context: Context,
     private val store: Store,
@@ -32,34 +64,124 @@ class ContentRepository(
         private set
     private val categoryCache = HashMap<String, List<Content>>()
     private val lock = Mutex()
+    private var job: Job? = null
 
-    fun reload() {
+    private fun cacheFile(id: String) = File(context.filesDir, "library/$id.pb")
+
+    /** Abre a lista ativa: usa o cache se existir e só atualiza pela rede quando venceu. */
+    fun open() {
         val p = store.activePlaylist ?: run { source = null; _library.value = Library(); return }
+        source = IptvSource.create(context, p, store.settings.liveFormat)
+        categoryCache.clear()
+        epg.clear()
+        job?.cancel()
+        _library.value = Library(loading = true)
+        job = scope.launch {
+            val cached = withContext(Dispatchers.IO) { readCache(p.id) }
+            if (cached == null) { refreshNow(); return@launch }
+            _library.value = cached
+            val hours = store.settings.refreshHours
+            val age = System.currentTimeMillis() - cached.updatedAt
+            if (hours > 0 && age > hours * 3600_000L) refreshNow()
+            else launch(Dispatchers.IO) { epg.load(source?.epgUrl()) }
+        }
+    }
+
+    /** Alias antigo: abrir a lista (ex.: ao trocar de lista ativa). */
+    fun reload() = open()
+
+    /** Baixa tudo de novo pela rede, mostrando o progresso por tipo. */
+    fun refresh() {
+        job?.cancel()
+        job = scope.launch { refreshNow() }
+    }
+
+    private suspend fun refreshNow() {
+        val p = store.activePlaylist ?: return
         val src = IptvSource.create(context, p, store.settings.liveFormat)
         source = src
         categoryCache.clear()
-        epg.clear()
-        _library.value = Library(loading = true)
-        scope.launch(Dispatchers.IO) {
-            try {
+        val steps = listOf(
+            LoadStep("LIVE", "TV ao vivo"), LoadStep("MOVIE", "Filmes"),
+            LoadStep("SERIES", "Séries"), LoadStep("EPG", "Guia de programação")
+        )
+        val old = _library.value
+        _library.value = old.copy(loading = old.items.isEmpty(), refreshing = true, error = null, steps = steps)
+        fun step(id: String, st: StepState, count: Int = 0) = _library.update { l ->
+            l.copy(steps = l.steps.map { if (it.id == id) it.copy(state = st, count = count) else it })
+        }
+        try {
+            val result = withContext(Dispatchers.IO) {
                 coroutineScope {
                     val kinds = listOf(Kind.LIVE, Kind.MOVIE, Kind.SERIES)
-                    val cats = kinds.map { k -> async { k to runCatching { src.categories(k) }.getOrDefault(emptyList()) } }
-                    val items = kinds.map { k -> async { k to runCatching { src.items(k) }.getOrNull() } }
-                    val catMap = cats.associate { it.await() }
-                    val itemMap = items.associate { it.await() }.mapValues { it.value ?: emptyList() }
-                    if (catMap.values.all { it.isEmpty() } && itemMap.values.all { it.isEmpty() }) {
-                        _library.value = Library(error = "Não foi possível carregar a lista. Verifique o login e a conexão.")
-                    } else {
-                        _library.value = Library(catMap, itemMap)
-                    }
+                    kinds.map { k ->
+                        async {
+                            step(k.name, StepState.LOADING)
+                            val cats = runCatching { src.categories(k) }
+                            val items = runCatching { src.items(k) }
+                            val ok = cats.isSuccess || (items.isSuccess && items.getOrNull() != null)
+                            val catList = cats.getOrDefault(emptyList())
+                            val itemList = items.getOrNull().orEmpty()
+                            step(k.name, if (ok) StepState.OK else StepState.FAILED, if (itemList.isNotEmpty()) itemList.size else catList.size)
+                            Triple(k, catList, itemList)
+                        }
+                    }.map { it.await() }
                 }
-                epg.load(src.epgUrl())
-            } catch (e: Throwable) {
-                _library.value = Library(error = e.message ?: "Erro ao carregar")
             }
+            val catMap = result.associate { it.first to it.second }
+            val itemMap = result.associate { it.first to it.third }
+            if (catMap.values.all { it.isEmpty() } && itemMap.values.all { it.isEmpty() }) {
+                // Mantém o que já havia em cache, se houver.
+                _library.update { l ->
+                    l.copy(loading = false, error = if (l.items.isEmpty() && l.categories.isEmpty())
+                        "Não foi possível carregar a lista. Verifique o login e a conexão." else null)
+                }
+                step("EPG", StepState.FAILED)
+            } else {
+                val now = System.currentTimeMillis()
+                _library.update { it.copy(categories = catMap, items = itemMap, loading = false, error = null, updatedAt = now) }
+                withContext(Dispatchers.IO) { writeCache(p.id, catMap, itemMap, now) }
+                store.updateSettings { it.copy(libraryUpdated = it.libraryUpdated + (p.id to now)) }
+                step("EPG", StepState.LOADING)
+                val n = withContext(Dispatchers.IO) { epg.load(src.epgUrl(), force = true) }
+                step("EPG", if (n >= 0) StepState.OK else StepState.FAILED, n.coerceAtLeast(0))
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            _library.update { it.copy(loading = false, error = if (it.items.isEmpty()) (e.message ?: "Erro ao carregar") else null) }
+        } finally {
+            _library.update { it.copy(refreshing = false) }
         }
     }
+
+    private fun readCache(id: String): Library? = runCatching {
+        val f = cacheFile(id)
+        if (!f.exists()) return null
+        val c = ProtoBuf.decodeFromByteArray(LibraryCache.serializer(), f.readBytes())
+        Library(
+            categories = mapOf(Kind.LIVE to c.liveCats, Kind.MOVIE to c.movieCats, Kind.SERIES to c.seriesCats),
+            items = mapOf(Kind.LIVE to c.live, Kind.MOVIE to c.movies, Kind.SERIES to c.series),
+            updatedAt = c.savedAt
+        )
+    }.getOrNull()
+
+    private fun writeCache(id: String, cats: Map<Kind, List<Category>>, items: Map<Kind, List<Content>>, at: Long) {
+        runCatching {
+            val c = LibraryCache(
+                live = items[Kind.LIVE].orEmpty(), movies = items[Kind.MOVIE].orEmpty(), series = items[Kind.SERIES].orEmpty(),
+                liveCats = cats[Kind.LIVE].orEmpty(), movieCats = cats[Kind.MOVIE].orEmpty(), seriesCats = cats[Kind.SERIES].orEmpty(),
+                savedAt = at
+            )
+            val f = cacheFile(id)
+            f.parentFile?.mkdirs()
+            val tmp = File(f.path + ".tmp")
+            tmp.writeBytes(ProtoBuf.encodeToByteArray(LibraryCache.serializer(), c))
+            tmp.renameTo(f)
+        }
+    }
+
+    fun deleteCache(id: String) { cacheFile(id).delete() }
 
     private fun allowed(c: Category?): Boolean {
         val kids = store.activeProfile?.kids == true

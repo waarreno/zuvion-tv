@@ -52,6 +52,7 @@ class AppState(val app: ZuvionApp) {
     val repo get() = app.repo
     val epg get() = app.epg
     val updater get() = app.updater
+    val meta get() = app.meta
 
     val stack = mutableStateListOf<Screen>()
     var tab by mutableStateOf(Tab.HOME)
@@ -67,7 +68,7 @@ class AppState(val app: ZuvionApp) {
             d.profiles.size > 1 -> stack.add(Screen.Profiles)
             else -> stack.add(Screen.Main)
         }
-        if (d.playlists.isNotEmpty()) repo.reload()
+        if (d.playlists.isNotEmpty()) repo.open()
     }
 
     val current: Screen get() = stack.lastOrNull() ?: Screen.Main

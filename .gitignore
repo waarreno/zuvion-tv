@@ -11,3 +11,4 @@ keystore.b64
 .claude/
 .signing/
 *.p12
+.omc/

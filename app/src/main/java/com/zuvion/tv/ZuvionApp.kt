@@ -8,6 +8,7 @@ import coil.memory.MemoryCache
 import com.zuvion.tv.data.ContentRepository
 import com.zuvion.tv.data.EpgRepository
 import com.zuvion.tv.data.Store
+import com.zuvion.tv.meta.Metadata
 import com.zuvion.tv.source.Http
 import com.zuvion.tv.update.Updater
 import kotlinx.coroutines.CoroutineScope
@@ -20,6 +21,7 @@ class ZuvionApp : Application(), ImageLoaderFactory {
     lateinit var epg: EpgRepository
     lateinit var repo: ContentRepository
     lateinit var updater: Updater
+    lateinit var meta: Metadata
 
     override fun onCreate() {
         super.onCreate()
@@ -28,6 +30,7 @@ class ZuvionApp : Application(), ImageLoaderFactory {
         epg = EpgRepository(this)
         repo = ContentRepository(this, store, epg, scope)
         updater = Updater(this)
+        meta = Metadata(this, store)
     }
 
     override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)

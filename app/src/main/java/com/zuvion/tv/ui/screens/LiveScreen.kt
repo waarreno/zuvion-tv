@@ -125,7 +125,7 @@ fun LiveScreen(state: AppState) {
             when {
                 list == null -> LoadingView()
                 list.isEmpty() -> EmptyView(if (selected == CAT_FAV) "Toque longo em um canal para favoritar." else "Nenhum canal nesta categoria.")
-                else -> LazyColumn(contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 110.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                else -> LazyColumn(contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(list) { c -> ChannelRowItem(state, c, programs.isNotEmpty()) { state.play(c, list) } }
                 }
             }

@@ -13,6 +13,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -27,21 +31,35 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/**
+ * Cores do app. Leem [dark] (estado do Compose), então trocar o tema
+ * recompõe tudo sem precisar passar cores por parâmetro.
+ */
 object Z {
-    val Space = Color(0xFF060814)
-    val SpaceDeep = Color(0xFF03040B)
-    val Text = Color(0xFFF4F5FF)
-    val Muted = Color(0xFFBDC1E3)
-    val Faint = Color(0xFF8C90B3)
-    val Violet = Color(0xFFB9AEFF)
+    var dark by mutableStateOf(true)
+    private fun c(d: Long, l: Long) = Color(if (dark) d else l)
+
+    val Space get() = c(0xFF060814, 0xFFEEF0FA)
+    val SpaceDeep get() = c(0xFF03040B, 0xFFE3E6F5)
+    val Text get() = c(0xFFF4F5FF, 0xFF12142A)
+    val Muted get() = c(0xFFBDC1E3, 0xFF4B4F72)
+    val Faint get() = c(0xFF8C90B3, 0xFF7D81A3)
+    val Violet get() = c(0xFFB9AEFF, 0xFF6246EA)
     val VioletDeep = Color(0xFF7C60FF)
-    val Cyan = Color(0xFF8FE6F2)
+    val Cyan get() = c(0xFF8FE6F2, 0xFF0B8EAA)
     val CyanDeep = Color(0xFF26C4E4)
-    val Live = Color(0xFFFF5A6E)
+    val Live = Color(0xFFFF4D63)
     val Ink = Color(0xFF0B0D1F)
-    val GlassHi = Color.White.copy(alpha = 0.16f)
-    val GlassLo = Color.White.copy(alpha = 0.05f)
-    val Accent = Brush.linearGradient(listOf(Violet, Color(0xFF5BD8EE)))
+    /** Cor de contraste (branco no escuro, tinta no claro) para véus e trilhos. */
+    val Tint get() = if (dark) Color.White else Color(0xFF1B1E3C)
+    /** Botão principal: branco no escuro, tinta no claro. */
+    val Primary get() = c(0xFFF4F5FF, 0xFF1B1E3C)
+    val OnPrimary get() = c(0xFF0B0D1F, 0xFFFFFFFF)
+    val Focus get() = if (dark) Color.White else Color(0xFF6246EA)
+    val GlassHi get() = if (dark) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.82f)
+    val GlassLo get() = if (dark) Color.White.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.55f)
+    val Panel get() = if (dark) Color(0xF0101429) else Color(0xF5F7F8FF)
+    val Accent get() = Brush.linearGradient(listOf(Violet, if (dark) Color(0xFF5BD8EE) else Color(0xFF16A9C8)))
 
     val palette = listOf(
         Color(0xFF6E5BFF), Color(0xFF18A9C9), Color(0xFFD9468A), Color(0xFFE29A2E),
@@ -74,10 +92,14 @@ private val typography = Typography(
 @Composable
 fun ZuvionTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = darkColorScheme(
+        colorScheme = if (Z.dark) darkColorScheme(
             primary = Z.Violet, onPrimary = Z.Ink, secondary = Z.Cyan,
             background = Z.Space, surface = Z.Space, onBackground = Z.Text, onSurface = Z.Text,
             surfaceVariant = Color(0xFF1A1D33), onSurfaceVariant = Z.Muted, error = Z.Live
+        ) else lightColorScheme(
+            primary = Z.Violet, onPrimary = Color.White, secondary = Z.Cyan,
+            background = Z.Space, surface = Color.White, onBackground = Z.Text, onSurface = Z.Text,
+            surfaceVariant = Color(0xFFE3E6F5), onSurfaceVariant = Z.Muted, error = Z.Live
         ),
         typography = typography,
         content = content
@@ -93,20 +115,21 @@ fun SpaceBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
             .background(Z.Space)
             .drawBehind {
                 val w = size.width; val h = size.height
+                val k = if (Z.dark) 1f else 0.45f
                 drawCircle(
-                    Brush.radialGradient(listOf(Z.VioletDeep.copy(alpha = 0.55f), Color.Transparent), center = Offset(w * 0.85f, h * 0.02f), radius = w * 0.55f),
+                    Brush.radialGradient(listOf(Z.VioletDeep.copy(alpha = 0.55f * k), Color.Transparent), center = Offset(w * 0.85f, h * 0.02f), radius = w * 0.55f),
                     radius = w * 0.55f, center = Offset(w * 0.85f, h * 0.02f)
                 )
                 drawCircle(
-                    Brush.radialGradient(listOf(Z.CyanDeep.copy(alpha = 0.28f), Color.Transparent), center = Offset(w * 0.02f, h * 0.98f), radius = w * 0.45f),
+                    Brush.radialGradient(listOf(Z.CyanDeep.copy(alpha = 0.28f * k), Color.Transparent), center = Offset(w * 0.02f, h * 0.98f), radius = w * 0.45f),
                     radius = w * 0.45f, center = Offset(w * 0.02f, h * 0.98f)
                 )
                 drawCircle(
-                    Brush.radialGradient(listOf(Color(0xFFD65CFF).copy(alpha = 0.12f), Color.Transparent), center = Offset(w * 0.5f, h * 0.6f), radius = w * 0.3f),
+                    Brush.radialGradient(listOf(Color(0xFFD65CFF).copy(alpha = 0.12f * k), Color.Transparent), center = Offset(w * 0.5f, h * 0.6f), radius = w * 0.3f),
                     radius = w * 0.3f, center = Offset(w * 0.5f, h * 0.6f)
                 )
                 val stars = listOf(0.12f to 0.18f, 0.34f to 0.72f, 0.58f to 0.22f, 0.76f to 0.64f, 0.9f to 0.34f, 0.22f to 0.48f, 0.66f to 0.88f, 0.44f to 0.08f, 0.05f to 0.6f)
-                stars.forEachIndexed { i, (x, y) ->
+                if (Z.dark) stars.forEachIndexed { i, (x, y) ->
                     drawCircle(Color.White.copy(alpha = if (i % 2 == 0) 0.6f else 0.35f), radius = if (i % 3 == 0) 1.6f else 1.1f, center = Offset(w * x, h * y))
                 }
             },
@@ -119,12 +142,16 @@ fun Modifier.glass(shape: Shape = RoundedCornerShape(24.dp), strong: Boolean = f
     .clip(shape)
     .background(
         Brush.linearGradient(
-            if (strong) listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.08f))
-            else listOf(Z.GlassHi, Z.GlassLo)
+            when {
+                !Z.dark && strong -> listOf(Color.White.copy(alpha = 0.95f), Color.White.copy(alpha = 0.78f))
+                strong -> listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.08f))
+                else -> listOf(Z.GlassHi, Z.GlassLo)
+            }
         )
     )
     .border(
         1.dp,
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.38f), Color.White.copy(alpha = 0.06f))),
+        if (Z.dark) Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.38f), Color.White.copy(alpha = 0.06f)))
+        else Brush.verticalGradient(listOf(Color.White, Color(0xFF1B1E3C).copy(alpha = 0.10f))),
         shape
     )

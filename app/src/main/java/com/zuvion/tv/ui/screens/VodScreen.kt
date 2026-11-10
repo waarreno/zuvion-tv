@@ -46,7 +46,7 @@ fun VodScreen(state: AppState, kind: Kind) {
                 list.isEmpty() -> EmptyView(if (selected == CAT_FAV) "Nada na sua lista ainda. Segure OK (ou toque longo) para adicionar." else "Nada nesta categoria.")
                 else -> LazyVerticalGrid(
                     columns = GridCells.Adaptive(if (tv) 150.dp else 110.dp),
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = if (tv) 24.dp else 110.dp),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {

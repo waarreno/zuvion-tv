@@ -28,6 +28,7 @@ data class Profile(
 @Serializable
 enum class Kind { LIVE, MOVIE, SERIES, EPISODE, RECORDING }
 
+@Serializable
 data class Category(val id: String, val name: String, val kind: Kind) {
     val adult: Boolean get() = isAdultName(name)
 }
@@ -52,7 +53,9 @@ data class Content(
     val seriesId: String? = null,
     val season: Int = 0,
     val episode: Int = 0,
-    val added: Long = 0
+    val added: Long = 0,
+    /** Id no TMDB (preenchido pelos metadados; usado no TheIntroDB). */
+    val tmdbId: Int = 0
 ) {
     val key: String get() = "$playlistId|$kind|$id"
 }
@@ -101,7 +104,14 @@ data class Settings(
     val parentalPin: String? = null,
     val hideAdult: Boolean = false,
     val lastUpdateCheck: Long = 0,
-    val skippedVersion: String? = null
+    val skippedVersion: String? = null,
+    val theme: String = "system",        // system | dark | light
+    val refreshHours: Int = 24,          // 0 = só manual
+    val libraryUpdated: Map<String, Long> = emptyMap(),
+    val tmdbKey: String = "",
+    val omdbKey: String = "",
+    val introDbKey: String = "",
+    val autoSkipIntro: Boolean = false
 )
 
 @Serializable
