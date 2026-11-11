@@ -108,6 +108,7 @@ fun GlassField(
     val focus = LocalFocusManager.current
     var focused by remember { mutableStateOf(false) }
     val coveredField = com.zuvion.tv.ui.theme.LocalCovered.current
+    val fieldLayer = com.zuvion.tv.ui.theme.LocalLayerFocus.current
     // Na TV o teclado só abre com OK: assim as setas passam pelo campo sem prender no teclado.
     val tvField = com.zuvion.tv.ui.theme.LocalIsTv.current
     var editing by remember { mutableStateOf(false) }
@@ -139,7 +140,7 @@ fun GlassField(
             ),
             // No controle remoto, ▲/▼ saem do campo (alguns Google TV prendem o foco no texto).
             modifier = Modifier.fillMaxWidth()
-                .focusProperties { canFocus = !coveredField }
+                .focusProperties { canFocus = !coveredField && fieldLayer?.covered != true }
                 .focusRequester(fieldFr)
                 .onFocusChanged { focused = it.isFocused; if (!it.isFocused && !reopening) editing = false }
                 .onPreviewKeyEvent { ev ->
