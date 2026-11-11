@@ -84,7 +84,7 @@ fun Focusable(
     val covered = com.zuvion.tv.ui.theme.LocalCovered.current
     val layerFocus = com.zuvion.tv.ui.theme.LocalLayerFocus.current
     val requester = remember { androidx.compose.ui.focus.FocusRequester() }
-    androidx.compose.runtime.DisposableEffect(layerFocus) { onDispose { if (layerFocus?.last === requester) layerFocus.last = null } }
+    androidx.compose.runtime.DisposableEffect(layerFocus) { onDispose { if (layerFocus?.last === requester) { android.util.Log.d("ZFocus", "dispose last ${requester.hashCode()}"); layerFocus.last = null } } }
     val scale by animateFloatAsState(if (focused) focusScale else 1f, label = "focusScale")
     val interaction = remember { MutableInteractionSource() }
     Box(
@@ -99,6 +99,7 @@ fun Focusable(
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused && layerFocus?.covered != true && layerFocus?.restoring != true) layerFocus?.last = requester
+                if (it.isFocused) android.util.Log.d("ZFocus", "focus ${requester.hashCode()} cov=${layerFocus?.covered} res=${layerFocus?.restoring}")
                 if (it.isFocused && layerFocus?.covered != true) onFocus?.invoke()
             }
             .combinedClickable(

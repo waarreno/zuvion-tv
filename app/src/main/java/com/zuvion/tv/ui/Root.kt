@@ -204,6 +204,7 @@ private fun ScreenLayer(covered: Boolean, content: @Composable () -> Unit) {
             wasCovered = false
             delay(60)
             val r = layerFocus.last?.let { runCatching { it.requestFocus() } }
+            android.util.Log.d("ZFocus", "restore last=${layerFocus.last?.hashCode()} err=${r?.exceptionOrNull()}")
             if (r == null || r.isFailure) runCatching { fr.requestFocus() }
             delay(80)
             if (!hasFocus) runCatching { fr.requestFocus() }
