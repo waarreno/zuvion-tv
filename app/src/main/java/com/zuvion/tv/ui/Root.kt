@@ -183,6 +183,7 @@ private fun ScreenContent(state: AppState, s: Screen) {
 private fun ScreenLayer(covered: Boolean, content: @Composable () -> Unit) {
     val fr = remember { FocusRequester() }
     val layerFocus = remember { com.zuvion.tv.ui.theme.LayerFocus() }
+    layerFocus.covered = covered
     val tv = LocalIsTv.current
     var wasCovered by remember { mutableStateOf(false) }
     var hasFocus by remember { mutableStateOf(false) }
@@ -193,10 +194,8 @@ private fun ScreenLayer(covered: Boolean, content: @Composable () -> Unit) {
             wasCovered = false
             delay(60)
             val r = layerFocus.last?.let { runCatching { it.requestFocus() } }
-            android.util.Log.d("ZFocus", "restore last=${layerFocus.last != null} result=${r?.exceptionOrNull()} hasFocus=$hasFocus")
             if (r == null || r.isFailure) runCatching { fr.requestFocus() }
             delay(80)
-            android.util.Log.d("ZFocus", "after 80ms hasFocus=$hasFocus")
             if (!hasFocus) runCatching { fr.requestFocus() }
         } else if (tv) {
             // Tela nova sem foco próprio: na TV, seleciona o primeiro item (senão as setas não respondem).
@@ -213,7 +212,7 @@ private fun ScreenLayer(covered: Boolean, content: @Composable () -> Unit) {
                     while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
                 }
             } else Modifier)
-            .onFocusChanged { hasFocus = it.hasFocus; android.util.Log.d("ZFocus", "layer covered=$covered hasFocus=${it.hasFocus}") }
+            .onFocusChanged { hasFocus = it.hasFocus }
     ) {
         Box(Modifier.fillMaxSize().focusRequester(fr).focusGroup()) {
             androidx.compose.runtime.CompositionLocalProvider(

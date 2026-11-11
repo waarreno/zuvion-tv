@@ -81,7 +81,11 @@ val LocalIsTv = staticCompositionLocalOf { false }
 val LocalCovered = androidx.compose.runtime.compositionLocalOf { false }
 
 /** Último item focado de uma tela, para devolver o foco a ele ao voltar (sem fixar itens de listas). */
-class LayerFocus { var last: androidx.compose.ui.focus.FocusRequester? = null }
+class LayerFocus {
+    var last: androidx.compose.ui.focus.FocusRequester? = null
+    /** Atualizado na hora (sem esperar recomposição): enquanto coberta, nada é registrado. */
+    @Volatile var covered: Boolean = false
+}
 val LocalLayerFocus = staticCompositionLocalOf<LayerFocus?> { null }
 
 fun isTvDevice(ctx: Context): Boolean {
