@@ -85,6 +85,8 @@ class LayerFocus {
     var last: androidx.compose.ui.focus.FocusRequester? = null
     /** Atualizado na hora (sem esperar recomposição): enquanto coberta, nada é registrado. */
     @Volatile var covered: Boolean = false
+    /** Entre ser descoberta e o foco ser devolvido: ignora o foco automático do Android ("Início"). */
+    @Volatile var restoring: Boolean = false
 }
 val LocalLayerFocus = staticCompositionLocalOf<LayerFocus?> { null }
 
