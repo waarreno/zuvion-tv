@@ -99,6 +99,7 @@ fun Focusable(
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused && layerFocus?.covered != true) { layerFocus?.last = requester; onFocus?.invoke() }
+                if (it.isFocused) android.util.Log.d("ZFocus", "FOCUS item=${requester.hashCode()} layerCovered=${layerFocus?.covered}", Throwable())
             }
             .combinedClickable(
                 interactionSource = interaction,

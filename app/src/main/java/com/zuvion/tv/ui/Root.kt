@@ -193,9 +193,11 @@ private fun ScreenLayer(covered: Boolean, content: @Composable () -> Unit) {
             // Voltou ao topo: devolve o foco ao último item selecionado nesta tela.
             wasCovered = false
             delay(60)
+            android.util.Log.d("ZFocus", "RESTORE to=${layerFocus.last?.hashCode()} hasFocus=$hasFocus")
             val r = layerFocus.last?.let { runCatching { it.requestFocus() } }
             if (r == null || r.isFailure) runCatching { fr.requestFocus() }
             delay(80)
+            android.util.Log.d("ZFocus", "AFTER hasFocus=$hasFocus")
             if (!hasFocus) runCatching { fr.requestFocus() }
         } else if (tv) {
             // Tela nova sem foco próprio: na TV, seleciona o primeiro item (senão as setas não respondem).
