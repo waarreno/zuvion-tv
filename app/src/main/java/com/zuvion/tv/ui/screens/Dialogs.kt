@@ -38,6 +38,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.window.DialogProperties
 import com.zuvion.tv.ui.AppState
 import com.zuvion.tv.ui.components.PillButton
@@ -49,19 +51,24 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun GlassDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    // A janela do diálogo cria sua própria área de desenho com a densidade nativa da tela;
+    // repassamos a escala do app (1280×720 na TV) para o diálogo ficar no mesmo tamanho do resto.
+    val appDensity = LocalDensity.current
     Dialog(onDismiss, DialogProperties(usePlatformDefaultWidth = false)) {
+      CompositionLocalProvider(LocalDensity provides appDensity) {
         // Rolável: em telas baixas (TV, celular deitado, teclado aberto) nada fica cortado;
         // o foco do controle traz o item focado para a área visível.
         Box(Modifier.fillMaxSize().background(Color(0x99040610)).systemBarsPadding().imePadding(), contentAlignment = Alignment.Center) {
             Column(
                 Modifier.padding(horizontal = 24.dp, vertical = 20.dp).widthIn(max = 600.dp).fillMaxWidth()
                     .background(Z.Panel, RoundedCornerShape(32.dp))
-                    .glass(RoundedCornerShape(32.dp), strong = true)
+                    .glass(RoundedCornerShape(32.dp), strong = !Z.dark)
                     .verticalScroll(rememberScrollState())
                     .padding(28.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) { content() }
         }
+      }
     }
 }
 

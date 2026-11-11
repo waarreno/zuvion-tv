@@ -2,6 +2,15 @@ package com.zuvion.tv.ui
 
 import android.app.Activity
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.focusGroup
+import androidx.compose.runtime.key
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
@@ -99,15 +108,15 @@ fun Root(state: AppState) {
     LaunchedEffect(Unit) { delay(2100); splash = false }
 
     SpaceBackground {
-        when (val s = state.current) {
-            Screen.Setup -> SetupScreen(state)
-            Screen.Profiles -> ProfilesScreen(state)
-            Screen.About -> com.zuvion.tv.ui.screens.AboutScreen(state)
-            Screen.Main -> MainShell(state)
-            is Screen.MovieDetail -> MovieDetailScreen(state, s.item)
-            is Screen.SeriesDetail -> SeriesDetailScreen(state, s.item)
-            is Screen.Player -> PlayerScreen(state, s)
-            is Screen.Multi -> MultiScreen(state, s)
+        // Pilha de telas: as de baixo (Início/abas e Detalhes) continuam vivas, invisíveis e sem foco.
+        // Ao voltar, a tela reaparece exatamente como estava: aba, categoria, rolagem e o item focado.
+        val stack = state.stack.toList()
+        stack.forEachIndexed { i, sc ->
+            val top = i == stack.lastIndex
+            val keepAlive = sc == Screen.Main || sc is Screen.MovieDetail || sc is Screen.SeriesDetail
+            if (top || keepAlive) key(i, System.identityHashCode(sc)) {
+                ScreenLayer(covered = !top) { ScreenContent(state, sc) }
+            }
         }
 
         // Progresso do carregamento da lista (TV ao vivo, Filmes, Séries, Guia).
@@ -149,6 +158,52 @@ fun Root(state: AppState) {
                 modifier = Modifier.glass(CircleShape, strong = true).padding(horizontal = 22.dp, vertical = 12.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun ScreenContent(state: AppState, s: Screen) {
+    when (s) {
+        Screen.Setup -> SetupScreen(state)
+        Screen.Profiles -> ProfilesScreen(state)
+        Screen.About -> com.zuvion.tv.ui.screens.AboutScreen(state)
+        Screen.Main -> MainShell(state)
+        is Screen.MovieDetail -> MovieDetailScreen(state, s.item)
+        is Screen.SeriesDetail -> SeriesDetailScreen(state, s.item)
+        is Screen.Player -> PlayerScreen(state, s)
+        is Screen.Multi -> MultiScreen(state, s)
+    }
+}
+
+/**
+ * Uma tela da pilha. Coberta: invisível, não recebe toque nem foco do controle.
+ * Ao voltar ao topo, devolve o foco ao último item que estava selecionado nela.
+ */
+@Composable
+private fun ScreenLayer(covered: Boolean, content: @Composable () -> Unit) {
+    val fr = remember { FocusRequester() }
+    var wasCovered by remember { mutableStateOf(false) }
+    LaunchedEffect(covered) {
+        if (covered) wasCovered = true
+        else if (wasCovered) {
+            wasCovered = false
+            delay(30)
+            runCatching { fr.requestFocus() }
+        }
+    }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer { alpha = if (covered) 0f else 1f }
+            .then(if (covered) Modifier.pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                }
+            } else Modifier)
+            .focusProperties { enter = { if (covered) FocusRequester.Cancel else FocusRequester.Default } }
+            .focusGroup()
+    ) {
+        Box(Modifier.fillMaxSize().focusRequester(fr).focusRestorer()) { content() }
     }
 }
 
