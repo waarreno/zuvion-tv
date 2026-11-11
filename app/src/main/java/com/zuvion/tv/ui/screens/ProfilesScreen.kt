@@ -1,5 +1,11 @@
 package com.zuvion.tv.ui.screens
 
+import androidx.compose.foundation.layout.heightIn
+
+import androidx.compose.foundation.verticalScroll
+
+import androidx.compose.foundation.rememberScrollState
+
 import androidx.compose.material.icons.outlined.Check
 
 import androidx.compose.material.icons.outlined.Edit
@@ -71,14 +77,17 @@ fun ProfilesScreen(state: AppState) {
         state.replaceAll(Screen.Main)
     }
 
+    // Centralizado quando cabe; rolável em telas baixas (celular deitado).
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
+    val minH = maxHeight
     Column(
-        Modifier.fillMaxSize().systemBarsPadding().padding(32.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).heightIn(min = minH).padding(horizontal = 24.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Wordmark(28)
-        Text("Quem está assistindo?", style = MaterialTheme.typography.displaySmall, color = Z.Text, modifier = Modifier.padding(top = 18.dp, bottom = 32.dp))
-        Text(if (manage) "Escolha o perfil que deseja editar." else " ", color = Z.Muted, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 8.dp))
+        Text("Quem está assistindo?", style = MaterialTheme.typography.displaySmall, color = Z.Text, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 18.dp, bottom = 24.dp))
+        Text(if (manage) "Escolha o perfil que deseja editar." else " ", color = Z.Muted, style = MaterialTheme.typography.bodyLarge, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(bottom = 8.dp))
         // contentPadding evita cortar o anel de foco (o item cresce ao ser selecionado)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(24.dp), contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)) {
             items(data.profiles, key = { it.id }) { p ->
@@ -114,6 +123,7 @@ fun ProfilesScreen(state: AppState) {
             PillButton(if (manage) "Concluído" else "Gerenciar perfis", { manage = !manage }, icon = if (manage) Icons.Outlined.Check else Icons.Outlined.Edit, primary = manage)
             if (state.stack.size > 1) PillButton("Voltar", { state.pop() })
         }
+    }
     }
 
     editing?.let { p -> ProfileEditor(state, p, canDelete = data.profiles.size > 1 && data.profiles.any { it.id == p.id }) { editing = null } }

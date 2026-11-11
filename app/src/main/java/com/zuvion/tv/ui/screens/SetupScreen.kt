@@ -84,6 +84,7 @@ import com.zuvion.tv.ui.components.Logo
 import com.zuvion.tv.ui.components.PillButton
 import com.zuvion.tv.ui.components.Wordmark
 import com.zuvion.tv.ui.theme.Z
+import com.zuvion.tv.ui.theme.fadeEdges
 import com.zuvion.tv.ui.theme.glass
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -293,11 +294,11 @@ fun SetupScreen(state: AppState) {
         if (wide) {
             Row(Modifier.fillMaxSize().padding(48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(56.dp)) {
                 Column(Modifier.weight(0.9f)) { brand() }
-                Column(Modifier.weight(1.1f).verticalScroll(rememberScrollState())) { form() }
+                Column(Modifier.weight(1.1f).fadeEdges().verticalScroll(rememberScrollState()).padding(vertical = 20.dp)) { form() }
             }
         } else {
             Column(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(22.dp),
+                Modifier.fillMaxSize().fadeEdges().verticalScroll(rememberScrollState()).padding(22.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {

@@ -53,6 +53,7 @@ import com.zuvion.tv.ui.components.PillButton
 import com.zuvion.tv.ui.components.PosterCard
 import com.zuvion.tv.ui.theme.LocalIsTv
 import com.zuvion.tv.ui.theme.Z
+import com.zuvion.tv.ui.theme.fadeEdges
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -69,8 +70,8 @@ fun RecordingsScreen(state: AppState) {
     }
     val fmt = remember { SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()) }
     LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 24.dp),
+        Modifier.fillMaxSize().fadeEdges(),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item { Text("Gravações", style = MaterialTheme.typography.headlineMedium, color = Z.Text) }
@@ -130,7 +131,8 @@ fun SearchScreen(state: AppState) {
         val vod = results.filter { it.kind != Kind.LIVE }
         LazyVerticalGrid(
             GridCells.Adaptive(if (tv) 150.dp else 110.dp),
-            contentPadding = PaddingValues(bottom = 24.dp, top = 4.dp),
+            modifier = Modifier.fadeEdges(),
+            contentPadding = PaddingValues(bottom = 28.dp, top = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {

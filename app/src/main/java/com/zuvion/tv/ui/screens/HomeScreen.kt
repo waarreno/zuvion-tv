@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -64,6 +65,7 @@ import com.zuvion.tv.ui.components.WideCard
 import com.zuvion.tv.ui.components.Wordmark
 import com.zuvion.tv.ui.theme.LocalIsTv
 import com.zuvion.tv.ui.theme.Z
+import com.zuvion.tv.ui.theme.fadeEdges
 
 @Composable
 fun HomeScreen(state: AppState) {
@@ -115,8 +117,8 @@ fun HomeScreen(state: AppState) {
     var hero by remember(recentMovies) { mutableStateOf(recentMovies.firstOrNull() ?: recentSeries.firstOrNull()) }
 
     LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp),
+        Modifier.fillMaxSize().fadeEdges(top = 14.dp),
+        contentPadding = PaddingValues(top = 6.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(26.dp)
     ) {
         item { HomeHeader(state, data.profiles.size > 1) }
@@ -160,9 +162,11 @@ fun HomeScreen(state: AppState) {
 
 @Composable
 private fun <T> ShelfRow(items: List<T>, title: String, card: @Composable (T) -> Unit) {
+    // Mesma margem lateral do cabeçalho e do destaque (alinhamento consistente).
+    val side = if (LocalIsTv.current) 28.dp else 20.dp
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionTitle(title, Modifier.padding(horizontal = 28.dp))
-        LazyRow(contentPadding = PaddingValues(horizontal = 28.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        SectionTitle(title, Modifier.padding(horizontal = side))
+        LazyRow(contentPadding = PaddingValues(horizontal = side, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(if (LocalIsTv.current) 16.dp else 12.dp)) {
             items(items) { card(it) }
         }
     }
@@ -173,17 +177,19 @@ private fun HomeHeader(state: AppState, multiProfile: Boolean) {
     val tv = LocalIsTv.current
     val profile = state.store.activeProfile
     androidx.compose.foundation.layout.Row(
-        Modifier.fillMaxWidth().padding(start = 28.dp, end = 28.dp, top = 22.dp),
+        Modifier.fillMaxWidth().padding(start = if (tv) 28.dp else 20.dp, end = if (tv) 28.dp else 20.dp, top = 22.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(Modifier.weight(1f)) {
-            Wordmark(22)
-            if (tv) Text("Sua TV, seu universo", style = MaterialTheme.typography.labelMedium, color = Z.Muted)
+        androidx.compose.foundation.layout.Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            com.zuvion.tv.ui.components.Logo(if (tv) 42.dp else 34.dp)
+            Column {
+                Wordmark(22)
+                if (tv) Text("Sua TV, seu universo", style = MaterialTheme.typography.labelMedium, color = Z.Muted, maxLines = 1)
+            }
         }
         androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(if (tv) 10.dp else 8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (!tv) {
                 IconGlassButton(Icons.Outlined.Search, "Buscar", { state.tab = Tab.SEARCH }, size = 40.dp)
-                IconGlassButton(Icons.Outlined.RadioButtonChecked, "Gravações", { state.tab = Tab.RECORDINGS }, size = 40.dp)
                 IconGlassButton(Icons.Outlined.Settings, "Configurações", { state.tab = Tab.SETTINGS }, size = 40.dp)
             } else {
                 IconGlassButton(Icons.Outlined.Refresh, "Atualizar lista", { state.repo.refresh() }, size = 44.dp)
@@ -216,26 +222,27 @@ private fun Hero(state: AppState, item: Content) {
     val backdrop = m?.backdrop
     Box(
         Modifier
-            .padding(horizontal = if (tv) 28.dp else 16.dp)
+            .padding(horizontal = if (tv) 28.dp else 20.dp)
             .fillMaxWidth()
-            .height(if (tv) 300.dp else 230.dp)
+            // Altura mínima; cresce se o título for longo (nada cortado em celulares estreitos).
+            .heightIn(min = if (tv) 300.dp else 230.dp)
             .clip(RoundedCornerShape(30.dp))
             .background(Z.Tint.copy(alpha = 0.04f), RoundedCornerShape(30.dp))
     ) {
         if (backdrop != null) {
-            AsyncImage(backdrop, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().alpha(0.8f))
+            AsyncImage(backdrop, null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize().alpha(0.8f))
         } else if (!poster.isNullOrBlank()) {
             AsyncImage(poster, null, contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().blur(28.dp).alpha(0.55f))
+                modifier = Modifier.matchParentSize().blur(28.dp).alpha(0.55f))
         }
-        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Z.Space.copy(alpha = 0.92f), Color.Transparent))))
-        androidx.compose.foundation.layout.Row(Modifier.fillMaxSize().padding(24.dp), verticalAlignment = Alignment.Bottom) {
+        Box(Modifier.matchParentSize().background(Brush.horizontalGradient(listOf(Z.Space.copy(alpha = 0.92f), Color.Transparent))))
+        androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().heightIn(min = if (tv) 300.dp else 230.dp).padding(if (tv) 24.dp else 20.dp), verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(if (item.kind == Kind.SERIES) "EM DESTAQUE · SÉRIE" else "EM DESTAQUE · FILME", style = MaterialTheme.typography.labelSmall, color = Z.Cyan)
                 Text(m?.title?.ifBlank { null } ?: item.title, style = if (tv) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium, color = Z.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 val meta = listOfNotNull(m?.year ?: item.year, (m?.rating ?: item.rating)?.let { "★ $it" }, m?.genres?.firstOrNull()).joinToString("  ·  ")
                 if (meta.isNotBlank()) Text(meta, style = MaterialTheme.typography.bodyMedium, color = Z.Muted)
-                androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     PillButton("Assistir", { if (item.kind == Kind.MOVIE) state.play(item) else state.open(item) }, icon = Icons.Outlined.PlayArrow, primary = true)
                     PillButton("Detalhes", { state.open(item) }, icon = Icons.Outlined.Info)
                 }

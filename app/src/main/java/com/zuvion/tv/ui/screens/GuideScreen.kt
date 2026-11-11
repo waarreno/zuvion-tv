@@ -46,6 +46,7 @@ import com.zuvion.tv.ui.components.Focusable
 import com.zuvion.tv.ui.components.LoadingView
 import com.zuvion.tv.ui.theme.LocalIsTv
 import com.zuvion.tv.ui.theme.Z
+import com.zuvion.tv.ui.theme.fadeEdges
 import com.zuvion.tv.ui.theme.glass
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -108,7 +109,7 @@ fun GuideScreen(state: AppState) {
         }
         when {
             channels == null -> LoadingView()
-            programs.isEmpty() && !loadingEpg -> EmptyView("Esta lista não tem guia (EPG). Em Configurações você pode informar uma URL XMLTV.")
+            programs.isEmpty() && !loadingEpg -> EmptyView("Esta lista não tem guia (EPG). Ligue o guia aberto em Configurações → Guia de programação.")
             programs.isEmpty() -> LoadingView("Baixando o guia de programação…")
             channels.isEmpty() -> EmptyView("Nenhum canal nesta categoria.")
             else -> Column(Modifier.fillMaxSize().padding(horizontal = 12.dp).glass(RoundedCornerShape(24.dp)).padding(10.dp)) {
@@ -126,7 +127,7 @@ fun GuideScreen(state: AppState) {
                     }
                 }
                 Box(Modifier.fillMaxSize()) {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 6.dp)) {
+                    LazyColumn(Modifier.fadeEdges(top = 14.dp, bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(top = 12.dp, bottom = 18.dp)) {
                         items(channels) { c ->
                             GuideRow(state, c, channels, windowStart, windowEnd, hScroll, tv) { p -> focusedProg = c to p }
                         }

@@ -65,6 +65,7 @@ import com.zuvion.tv.ui.components.Poster
 import com.zuvion.tv.ui.components.WideCard
 import com.zuvion.tv.ui.theme.LocalIsTv
 import com.zuvion.tv.ui.theme.Z
+import com.zuvion.tv.ui.theme.fadeEdges
 
 @Composable
 private fun Backdrop(url: String?) {
@@ -118,7 +119,8 @@ fun MovieDetailScreen(state: AppState, base: Content) {
         ) {
             if (tv) Poster(poster, item.name, Modifier.width(260.dp).height(385.dp).clip(RoundedCornerShape(24.dp)), label = item.name)
             Column(
-                Modifier.weight(1f).widthIn(max = 760.dp).then(if (!tv) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                // Rolável nos dois formatos: sinopses longas não cortam os botões (o foco rola até eles na TV).
+                Modifier.weight(1f).widthIn(max = 760.dp).fadeEdges().verticalScroll(rememberScrollState()).padding(vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 if (!tv) IconGlassButton(Icons.AutoMirrored.Outlined.ArrowBack, "Voltar", { state.pop() }, size = 44.dp)
@@ -191,7 +193,7 @@ private fun SeriesBody(
     val genres = m?.genres.orEmpty()
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     LazyColumn(
-        Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(),
+        Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().fadeEdges(),
         contentPadding = PaddingValues(if (tv) 48.dp else 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {

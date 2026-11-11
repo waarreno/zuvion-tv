@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import com.zuvion.tv.ZuvionApp
 import com.zuvion.tv.data.Content
 import com.zuvion.tv.data.Kind
@@ -25,10 +26,25 @@ enum class Tab(val label: String, val icon: ImageVector) {
     LIVE("Ao vivo", Icons.Outlined.LiveTv),
     MOVIES("Filmes", Icons.Outlined.Movie),
     SERIES("Séries", Icons.Outlined.VideoLibrary),
-    GUIDE("Guia", Icons.Outlined.CalendarViewWeek),
+    GUIDE("Guia", GuideIcon),
     RECORDINGS("Gravações", Icons.Outlined.RadioButtonChecked),
     SEARCH("Buscar", Icons.Outlined.Search),
     SETTINGS("Configurações", Icons.Outlined.Settings)
+}
+
+/** Ícone do Guia igual ao do protótipo: grade com cabeçalho e coluna de canais. */
+val GuideIcon: ImageVector by lazy {
+    ImageVector.Builder("Guia", 24.dp, 24.dp, 24f, 24f).apply {
+        val stroke = androidx.compose.ui.graphics.SolidColor(androidx.compose.ui.graphics.Color.Black)
+        addPath(
+            pathData = androidx.compose.ui.graphics.vector.PathParser().parsePathString(
+                "M5.5 4h13a2.5 2.5 0 0 1 2.5 2.5v11a2.5 2.5 0 0 1 -2.5 2.5h-13a2.5 2.5 0 0 1 -2.5 -2.5v-11a2.5 2.5 0 0 1 2.5 -2.5z M3 10h18 M9 10v10"
+            ).toNodes(),
+            fill = null, stroke = stroke, strokeLineWidth = 1.8f,
+            strokeLineCap = androidx.compose.ui.graphics.StrokeCap.Round,
+            strokeLineJoin = androidx.compose.ui.graphics.StrokeJoin.Round
+        )
+    }.build()
 }
 
 sealed interface Screen {

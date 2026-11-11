@@ -149,7 +149,7 @@ fun LoadProgressScreen(state: AppState, steps: List<LoadStep>) {
 private fun StepRow(st: LoadStep) {
     val icon = when (st.id) {
         "LIVE" -> Icons.Outlined.LiveTv; "MOVIE" -> Icons.Outlined.Movie
-        "SERIES" -> Icons.Outlined.VideoLibrary; else -> Icons.Outlined.CalendarViewWeek
+        "SERIES" -> Icons.Outlined.VideoLibrary; else -> com.zuvion.tv.ui.GuideIcon
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Icon(icon, null, tint = Z.Violet, modifier = Modifier.size(26.dp))

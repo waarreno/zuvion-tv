@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -48,11 +50,14 @@ import kotlinx.coroutines.launch
 @Composable
 fun GlassDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     Dialog(onDismiss, DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(Modifier.fillMaxSize().background(Color(0x99040610)), contentAlignment = Alignment.Center) {
+        // Rolável: em telas baixas (TV, celular deitado, teclado aberto) nada fica cortado;
+        // o foco do controle traz o item focado para a área visível.
+        Box(Modifier.fillMaxSize().background(Color(0x99040610)).systemBarsPadding().imePadding(), contentAlignment = Alignment.Center) {
             Column(
-                Modifier.padding(24.dp).widthIn(max = 560.dp).fillMaxWidth()
+                Modifier.padding(horizontal = 24.dp, vertical = 20.dp).widthIn(max = 600.dp).fillMaxWidth()
                     .background(Z.Panel, RoundedCornerShape(32.dp))
                     .glass(RoundedCornerShape(32.dp), strong = true)
+                    .verticalScroll(rememberScrollState())
                     .padding(28.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) { content() }

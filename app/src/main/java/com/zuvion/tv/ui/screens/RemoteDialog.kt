@@ -62,7 +62,7 @@ fun PhoneQrCard(mode: String, modifier: Modifier = Modifier) {
         Box(Modifier.background(Color.White, RoundedCornerShape(16.dp)).padding(8.dp)) {
             Image(bmp, "QR Code para digitar pelo celular", Modifier.size(132.dp), filterQuality = FilterQuality.None)
         }
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Mais fácil pelo celular", style = MaterialTheme.typography.titleMedium, color = Z.Text)
             Text("Escaneie com a câmera, preencha os dados no celular e a TV entra sozinha.", style = MaterialTheme.typography.bodyMedium, color = Z.Muted)
             Text("Celular e TV na mesma rede Wi-Fi.", style = MaterialTheme.typography.labelMedium, color = Z.Faint)

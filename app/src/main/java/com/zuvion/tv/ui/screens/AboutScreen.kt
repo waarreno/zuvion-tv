@@ -44,6 +44,7 @@ import com.zuvion.tv.ui.components.Wordmark
 import com.zuvion.tv.ui.theme.LocalIsTv
 import com.zuvion.tv.ui.theme.Z
 import com.zuvion.tv.ui.theme.glass
+import com.zuvion.tv.ui.theme.fadeEdges
 
 /** Pix estático (BR Code) para doações. */
 const val PIX_KEY = "ac6ffef1-a34a-4877-be9d-83cc7ee355d4"
@@ -58,7 +59,7 @@ fun AboutScreen(state: AppState) {
     val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR).coerceAtLeast(2026)
 
     Column(
-        Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState())
+        Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().fadeEdges().verticalScroll(rememberScrollState())
             .padding(horizontal = if (tv) 64.dp else 20.dp, vertical = if (tv) 40.dp else 20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
@@ -67,10 +68,12 @@ fun AboutScreen(state: AppState) {
             Text("Sobre e apoio", style = MaterialTheme.typography.headlineMedium, color = Z.Text)
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        // Cartões focáveis: no controle remoto o foco desce por eles e a tela rola junto.
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             // Sobre
+            Focusable({}, Modifier.widthIn(max = 560.dp), RoundedCornerShape(28.dp), focusScale = 1.01f) {
             Column(
-                Modifier.widthIn(max = 560.dp).glass(RoundedCornerShape(28.dp)).padding(24.dp),
+                Modifier.padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -91,10 +94,12 @@ fun AboutScreen(state: AppState) {
                     color = Z.Muted, style = MaterialTheme.typography.labelMedium)
                 Text("Código aberto: github.com/waarreno/zuvion-tv", color = Z.Violet, style = MaterialTheme.typography.labelLarge)
             }
+            }
 
             // Apoio
+            Focusable({}, Modifier.widthIn(max = 560.dp), RoundedCornerShape(28.dp), focusScale = 1.01f) {
             Column(
-                Modifier.widthIn(max = 560.dp).glass(RoundedCornerShape(28.dp)).padding(24.dp),
+                Modifier.padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text("Apoie o Zuvion TV", style = MaterialTheme.typography.titleLarge, color = Z.Text)
@@ -105,7 +110,7 @@ fun AboutScreen(state: AppState) {
                     Box(Modifier.background(Color.White, RoundedCornerShape(18.dp)).padding(10.dp)) {
                         Image(qr, "QR Code Pix para doação", Modifier.size(if (tv) 170.dp else 140.dp), filterQuality = FilterQuality.None)
                     }
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("Pix · chave aleatória", color = Z.Text, style = MaterialTheme.typography.titleMedium)
                         Text(PIX_KEY, color = Z.Muted, style = MaterialTheme.typography.labelMedium)
                         Text("Wárreno Hendrick", color = Z.Faint, style = MaterialTheme.typography.labelMedium)
@@ -118,6 +123,7 @@ fun AboutScreen(state: AppState) {
                         clip.setText(AnnotatedString(PIX_CODE)); state.showToast("Código Pix copiado")
                     }, Modifier.fillMaxWidth(), icon = Icons.Outlined.ContentCopy, primary = true)
                 }
+            }
             }
         }
     }

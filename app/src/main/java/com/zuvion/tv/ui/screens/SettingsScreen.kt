@@ -47,8 +47,10 @@ import com.zuvion.tv.ui.components.PillButton
 import com.zuvion.tv.ui.components.Wordmark
 import com.zuvion.tv.ui.theme.LocalIsTv
 import com.zuvion.tv.ui.theme.Z
+import com.zuvion.tv.ui.theme.fadeEdges
 import com.zuvion.tv.ui.theme.glass
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.outlined.RadioButtonChecked
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import com.zuvion.tv.data.OPEN_EPG_BR
 import androidx.compose.foundation.Image
@@ -115,11 +117,12 @@ fun SettingsScreen(state: AppState) {
     var newPin by remember { mutableStateOf("") }
     var epgEdit by remember { mutableStateOf<Playlist?>(null) }
     var keyEdit by remember { mutableStateOf<String?>(null) } // tmdb | omdb | intro
+    var deleting by remember { mutableStateOf<Playlist?>(null) }
     val lib by state.repo.library.collectAsState()
 
     LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 24.dp),
+        Modifier.fillMaxSize().fadeEdges(),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item { Text("Configurações", style = MaterialTheme.typography.headlineMedium, color = Z.Text) }
@@ -128,23 +131,22 @@ fun SettingsScreen(state: AppState) {
             Section("Listas IPTV") {
                 data.playlists.forEach { p ->
                     val active = p.id == (s.activePlaylistId ?: data.playlists.firstOrNull()?.id)
-                    Focusable({
-                        state.store.updateSettings { it.copy(activePlaylistId = p.id) }
-                        state.repo.open(); state.showToast("Lista “${p.name}” ativada")
-                    }, Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), glass = active, selected = active, focusScale = 1.01f) {
-                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            if (active) Icon(Icons.Outlined.CheckCircle, "Ativa", tint = Z.Cyan)
-                            Column(Modifier.weight(1f)) {
-                                Text(p.name, color = Z.Text, style = MaterialTheme.typography.titleMedium)
-                                Text("${typeLabel(p)} · ${p.url.substringAfterLast('/').ifBlank { p.url }.take(40)}", color = Z.Muted, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    // Ativar, EPG e excluir são itens irmãos: o controle remoto chega em cada um com ◀ ▶.
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Focusable({
+                            state.store.updateSettings { it.copy(activePlaylistId = p.id) }
+                            state.repo.open(); state.showToast("Lista “${p.name}” ativada")
+                        }, Modifier.weight(1f), RoundedCornerShape(18.dp), glass = active, selected = active, focusScale = 1.01f) {
+                            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                if (active) Icon(Icons.Outlined.CheckCircle, "Ativa", tint = Z.Cyan)
+                                Column(Modifier.weight(1f)) {
+                                    Text(p.name, color = Z.Text, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("${typeLabel(p)} · ${p.url.removePrefix("http://").removePrefix("https://").trimEnd('/').substringBefore('/').take(40)}", color = Z.Muted, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
                             }
-                            PillButton("EPG", { epgEdit = p })
-                            IconGlassButton(Icons.Outlined.Delete, "Remover lista", {
-                                state.store.removePlaylist(p.id)
-                                state.repo.deleteCache(p.id)
-                                if (state.store.data.value.playlists.isEmpty()) state.replaceAll(Screen.Setup) else state.repo.open()
-                            }, size = 44.dp)
                         }
+                        PillButton("EPG", { epgEdit = p })
+                        IconGlassButton(Icons.Outlined.Delete, "Remover lista", { deleting = p }, size = 46.dp)
                     }
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -185,6 +187,16 @@ fun SettingsScreen(state: AppState) {
                 KeyRow("OMDb", s.omdbKey, "omdbapi.com/apikey.aspx", false) { keyEdit = "omdb" }
                 KeyRow("TheIntroDB", s.introDbKey, "theintrodb.org", true) { keyEdit = "intro" }
                 ToggleRow("Pular aberturas automaticamente", s.autoSkipIntro) { v -> state.store.updateSettings { it.copy(autoSkipIntro = v) } }
+            }
+        }
+
+        if (!tv) item {
+            Focusable({ state.tab = com.zuvion.tv.ui.Tab.RECORDINGS }, Modifier.fillMaxWidth(), RoundedCornerShape(26.dp), focusScale = 1.01f) {
+                Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Icon(Icons.Outlined.RadioButtonChecked, null, tint = Z.Live)
+                    Text("Gravações", style = MaterialTheme.typography.titleLarge, color = Z.Text, modifier = Modifier.weight(1f))
+                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = Z.Muted)
+                }
             }
         }
 
@@ -284,6 +296,22 @@ fun SettingsScreen(state: AppState) {
                 }
             }
             ok
+        }
+    }
+
+    deleting?.let { p ->
+        GlassDialog({ deleting = null }) {
+            Text("Remover “${p.name}”?", style = MaterialTheme.typography.headlineMedium, color = Z.Text)
+            Text("A lista sai do app neste aparelho. Favoritos e histórico dela também deixam de aparecer.", color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                PillButton("Remover", {
+                    state.store.removePlaylist(p.id)
+                    state.repo.deleteCache(p.id)
+                    deleting = null
+                    if (state.store.data.value.playlists.isEmpty()) state.replaceAll(Screen.Setup) else state.repo.open()
+                }, Modifier.weight(1f), primary = true)
+                PillButton("Cancelar", { deleting = null }, Modifier.weight(1f))
+            }
         }
     }
 
