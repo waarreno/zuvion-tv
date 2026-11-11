@@ -92,7 +92,16 @@ fun Root(state: AppState) {
         }
     }
 
-    BackHandler(enabled = state.stack.size > 1 || state.tab != Tab.HOME) { state.pop() }
+    // Voltar: tela anterior → aba Início → "aperte voltar de novo para sair" (evita sair sem querer).
+    val activity = LocalView.current.context as? Activity
+    var lastBackAt by remember { mutableStateOf(0L) }
+    BackHandler(enabled = state.current == Screen.Main || state.stack.size > 1) {
+        if (!state.pop()) {
+            val now = System.currentTimeMillis()
+            if (now - lastBackAt < 2500) activity?.finish()
+            else { lastBackAt = now; state.showToast("Aperte voltar de novo para sair") }
+        }
+    }
 
     // Verificação automática de atualização (no máximo a cada 6h).
     LaunchedEffect(Unit) {
@@ -275,8 +284,16 @@ fun MainShell(state: AppState) {
 
 @Composable
 private fun NavRail(state: AppState) {
+    // Se o foco está no menu e a aba muda (ex.: voltar para Início), o foco acompanha o item da aba.
+    val tabs = Tab.entries.filter { it != Tab.SETTINGS }
+    val reqs = remember { tabs.associateWith { FocusRequester() } }
+    var railHasFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(state.tab) {
+        if (railHasFocus) { delay(50); reqs[state.tab]?.let { runCatching { it.requestFocus() } } }
+    }
     Column(
         Modifier
+            .onFocusChanged { railHasFocus = it.hasFocus }
             .padding(start = 20.dp, top = 20.dp, bottom = 20.dp)
             .width(84.dp)
             .fillMaxHeight()
@@ -288,11 +305,11 @@ private fun NavRail(state: AppState) {
         Logo(44.dp)
         Spacer(Modifier.height(14.dp))
         // Configurações ficam na engrenagem do topo da tela inicial (sem item extra no menu).
-        Tab.entries.filter { it != Tab.SETTINGS }.forEach { t ->
+        tabs.forEach { t ->
             val selected = state.tab == t
             Focusable(
                 onClick = { state.tab = t },
-                modifier = Modifier.size(52.dp),
+                modifier = Modifier.size(52.dp).focusRequester(reqs.getValue(t)),
                 shape = RoundedCornerShape(18.dp),
                 glass = selected,
                 selected = selected,

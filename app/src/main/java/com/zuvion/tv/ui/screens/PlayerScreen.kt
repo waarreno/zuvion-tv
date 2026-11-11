@@ -218,6 +218,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
     var showInfo by remember { mutableStateOf(false) }
     val rootFr = remember { FocusRequester() }
     val swallowOk = remember { booleanArrayOf(false) }
+    val swallowBack = remember { booleanArrayOf(false) }
     val playFr = remember { FocusRequester() }
     val panelOpen = showChannels || showTracks || showInfo
 
@@ -264,6 +265,8 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                 // O OK que só abriu os controles não pode "clicar" no botão de pausa ao ser solto.
                 if (ev.type == KeyEventType.KeyUp) {
                     if (isOk && swallowOk[0]) { swallowOk[0] = false; return@onPreviewKeyEvent true }
+                    // O "voltar" que só escondeu os controles não pode também fechar o player ao ser solto.
+                    if (ev.key.nativeKeyCode == AKeyEvent.KEYCODE_BACK && swallowBack[0]) { swallowBack[0] = false; return@onPreviewKeyEvent true }
                     return@onPreviewKeyEvent false
                 }
                 if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -275,7 +278,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                     AKeyEvent.KEYCODE_CHANNEL_DOWN -> { zap(-1); true }
                     AKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { engine.seekBy(30_000); true }
                     AKeyEvent.KEYCODE_MEDIA_REWIND -> { engine.seekBy(-30_000); true }
-                    AKeyEvent.KEYCODE_BACK -> if (overlay && !panelOpen) { overlay = false; true } else false
+                    AKeyEvent.KEYCODE_BACK -> if (overlay && !panelOpen) { overlay = false; swallowBack[0] = true; true } else false
                     else -> if (!overlay && !panelOpen && (inIntro || inCredits) &&
                         (code == AKeyEvent.KEYCODE_DPAD_CENTER || code == AKeyEvent.KEYCODE_ENTER)) { swallowOk[0] = true; doSkip(); true }
                     else if (!overlay && !panelOpen) {
