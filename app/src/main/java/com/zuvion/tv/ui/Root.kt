@@ -11,6 +11,8 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
@@ -114,23 +116,29 @@ fun Root(state: AppState) {
     }
 
     var splash by rememberSaveable { mutableStateOf(true) }
+    val lib by state.repo.library.collectAsState()
+    var showProgress by remember { mutableStateOf(false) }
+    val blockKeys = splash || (showProgress && (state.current == Screen.Main || state.current == Screen.Profiles) && lib.steps.isNotEmpty())
     LaunchedEffect(Unit) { delay(2100); splash = false }
 
     SpaceBackground {
         // Pilha de telas: as de baixo (Início/abas e Detalhes) continuam vivas, invisíveis e sem foco.
         // Ao voltar, a tela reaparece exatamente como estava: aba, categoria, rolagem e o item focado.
         val stack = state.stack.toList()
-        stack.forEachIndexed { i, sc ->
-            val top = i == stack.lastIndex
-            val keepAlive = sc == Screen.Main || sc is Screen.MovieDetail || sc is Screen.SeriesDetail
-            if (top || keepAlive) key(i, System.identityHashCode(sc)) {
-                ScreenLayer(covered = !top) { ScreenContent(state, sc) }
+        // Enquanto a tela de progresso cobre tudo, o controle não mexe nas telas por baixo.
+        Box(Modifier.fillMaxSize().onPreviewKeyEvent { ev ->
+            blockKeys && ev.key != androidx.compose.ui.input.key.Key.Back
+        }) {
+            stack.forEachIndexed { i, sc ->
+                val top = i == stack.lastIndex
+                val keepAlive = sc == Screen.Main || sc is Screen.MovieDetail || sc is Screen.SeriesDetail
+                if (top || keepAlive) key(i, System.identityHashCode(sc)) {
+                    ScreenLayer(covered = !top) { ScreenContent(state, sc) }
+                }
             }
         }
 
         // Progresso do carregamento da lista (TV ao vivo, Filmes, Séries, Guia).
-        val lib by state.repo.library.collectAsState()
-        var showProgress by remember { mutableStateOf(false) }
         LaunchedEffect(lib.refreshing) {
             if (lib.refreshing) showProgress = true
             else if (showProgress) { delay(1300); showProgress = false }
