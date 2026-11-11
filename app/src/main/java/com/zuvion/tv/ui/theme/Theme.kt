@@ -24,6 +24,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -174,3 +176,19 @@ fun Modifier.glass(shape: Shape = RoundedCornerShape(24.dp), strong: Boolean = f
         else Brush.verticalGradient(listOf(Color.White, Color(0xFF1B1E3C).copy(alpha = 0.10f))),
         shape
     )
+
+
+/** Esmaece suavemente o conteúdo que rola para baixo de cabeçalhos (topo) e da barra (base). */
+fun Modifier.fadeEdges(top: androidx.compose.ui.unit.Dp = 22.dp, bottom: androidx.compose.ui.unit.Dp = 22.dp): Modifier = this
+    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val h = size.height
+        if (h <= 0f) return@drawWithContent
+        val t = (top.toPx() / h).coerceIn(0f, 0.4f)
+        val b = (bottom.toPx() / h).coerceIn(0f, 0.4f)
+        drawRect(
+            Brush.verticalGradient(0f to Color.Transparent, t to Color.Black, 1f - b to Color.Black, 1f to Color.Transparent),
+            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn
+        )
+    }

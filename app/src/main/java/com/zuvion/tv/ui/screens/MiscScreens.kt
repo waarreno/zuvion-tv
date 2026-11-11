@@ -31,6 +31,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -107,7 +108,10 @@ private fun playFile(state: AppState, f: File) {
 fun SearchScreen(state: AppState) {
     val tv = LocalIsTv.current
     var q by remember { mutableStateOf("") }
-    val results = remember(q) { state.repo.search(q) }
+    val results by produceState(emptyList<Content>(), q) {
+        kotlinx.coroutines.delay(250) // espera a digitação parar
+        value = state.repo.search(q)
+    }
     val fr = remember { FocusRequester() }
     var phone by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { if (!tv) runCatching { fr.requestFocus() } }

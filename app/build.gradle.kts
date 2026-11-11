@@ -27,7 +27,6 @@ android {
         // Chaves padrão das APIs: vêm dos secrets do GitHub na compilação (nunca do código).
         fun secret(name: String) = (System.getenv(name) ?: "").replace("\"", "")
         buildConfigField("String", "TMDB_KEY", "\"${secret("ZUVION_TMDB_KEY")}\"")
-        buildConfigField("String", "OMDB_KEY", "\"${secret("ZUVION_OMDB_KEY")}\"")
         buildConfigField("String", "INTRODB_KEY", "\"${secret("ZUVION_INTRODB_KEY")}\"")
         vectorDrawables { useSupportLibrary = true }
         // APK único para ARM 32 e 64 bits: cobre todos os celulares, TV boxes e Google TV.

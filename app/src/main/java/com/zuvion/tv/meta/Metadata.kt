@@ -42,6 +42,8 @@ data class Meta(
     val rotten: String? = null,
     val metascore: String? = null,
     val omdbChecked: Boolean = false,
+    /** true quando já tem os detalhes completos (elenco, gêneros, duração). */
+    val detailed: Boolean = false,
     val savedAt: Long = 0
 ) {
     val found: Boolean get() = tmdbId > 0 || imdbId != null
@@ -65,7 +67,8 @@ class Metadata(private val context: Context, private val store: Store) {
 
     // A chave do usuário (Ajustes) tem prioridade; senão, a do app (secrets do GitHub).
     private val tmdbKey get() = store.settings.tmdbKey.trim().ifEmpty { BuildConfig.TMDB_KEY }
-    private val omdbKey get() = store.settings.omdbKey.trim().ifEmpty { BuildConfig.OMDB_KEY }
+    // OMDb tem cota diária pequena: só com a chave do próprio usuário.
+    private val omdbKey get() = store.settings.omdbKey.trim()
     private val introKey get() = store.settings.introDbKey.trim().ifEmpty { BuildConfig.INTRODB_KEY }
     val enabled: Boolean get() = tmdbKey.isNotEmpty() || omdbKey.isNotEmpty()
 
@@ -78,13 +81,18 @@ class Metadata(private val context: Context, private val store: Store) {
     suspend fun forContent(c: Content, full: Boolean = false): Meta? {
         if (!enabled || (c.kind != Kind.MOVIE && c.kind != Kind.SERIES)) return null
         val key = cacheKey(c)
-        mem.get(key)?.let { m -> if (!full || m.omdbChecked || omdbKey.isEmpty() || !m.found && tmdbKey.isNotEmpty()) return m.takeIf { it.found } }
+        fun complete(m: Meta) = !full || ((m.detailed || !m.found) && (m.omdbChecked || omdbKey.isEmpty()))
+        mem.get(key)?.let { m -> if (complete(m)) return m.takeIf { it.found } }
         return withContext(Dispatchers.IO) {
             val f = File(dir, md5(key) + ".json")
             val disk = runCatching { AppJson.decodeFromString(Meta.serializer(), f.readText()) }.getOrNull()
             val fresh = disk != null && System.currentTimeMillis() - disk.savedAt < (if (disk.found) 30L else 3L) * 86_400_000L
-            var meta = if (fresh) disk!! else gate.withPermit { fetch(c) } ?: return@withContext disk?.takeIf { it.found }
+            var meta = if (fresh) disk!! else gate.withPermit { fetch(c, full) } ?: return@withContext disk?.takeIf { it.found }
             var changed = !fresh
+            // Nas grades só a busca (1 chamada); os detalhes completos vêm ao abrir o título.
+            if (full && meta.found && !meta.detailed && meta.tmdbId > 0 && tmdbKey.isNotEmpty()) {
+                runCatching { gate.withPermit { tmdbDetails(meta.tmdbId, c.kind == Kind.SERIES, meta) } }.getOrNull()?.let { meta = it; changed = true }
+            }
             if (full && !meta.omdbChecked && omdbKey.isNotEmpty() && (meta.found || tmdbKey.isEmpty())) {
                 val (title, y) = cleanTitle(c.name)
                 meta = runCatching { omdb(meta.takeIf { it.found }, title, y ?: c.year?.take(4), c.kind == Kind.SERIES) }.getOrNull()
@@ -100,14 +108,14 @@ class Metadata(private val context: Context, private val store: Store) {
     private fun cacheKey(c: Content) = "${c.kind}|${cleanTitle(c.name).first.lowercase()}|${cleanTitle(c.name).second ?: c.year.orEmpty()}"
 
     /** null = erro de rede (não grava cache); Meta() vazio = não encontrado. */
-    private suspend fun fetch(c: Content): Meta? {
+    private suspend fun fetch(c: Content, full: Boolean): Meta? {
         val (title, yearFromName) = cleanTitle(c.name)
         val year = yearFromName ?: c.year?.take(4)?.takeIf { it.length == 4 }
         val tv = c.kind == Kind.SERIES
         var meta: Meta? = null
         var networkOk = true
         if (tmdbKey.isNotEmpty()) {
-            try { meta = tmdb(title, year, tv) } catch (_: Throwable) { networkOk = false }
+            try { meta = tmdb(title, year, tv, full) } catch (_: Throwable) { networkOk = false }
         }
         // Sem TMDB, o OMDb vira a fonte principal (senão ele só é consultado nos detalhes).
         if (tmdbKey.isEmpty() && omdbKey.isNotEmpty()) {
@@ -133,14 +141,29 @@ class Metadata(private val context: Context, private val store: Store) {
         return Http.getJson(u, h).obj()
     }
 
-    private suspend fun tmdb(title: String, year: String?, tv: Boolean): Meta? {
+    private suspend fun tmdb(title: String, year: String?, tv: Boolean, details: Boolean): Meta? {
         val type = if (tv) "tv" else "movie"
         val q = "query=" + enc(title) + (if (year != null) (if (tv) "&first_air_date_year=$year" else "&year=$year") else "")
         var results = tmdbGet("/search/$type", q)?.get("results").arr().orEmpty()
         if (results.isEmpty() && year != null) results = tmdbGet("/search/$type", "query=" + enc(title))?.get("results").arr().orEmpty()
         val hit = results.firstOrNull()?.obj() ?: return null
         val id = hit.int("id")
-        val d = tmdbGet("/$type/$id", "append_to_response=credits,external_ids") ?: hit
+        val basic = Meta(
+            tmdbId = id,
+            title = hit.str(if (tv) "name" else "title") ?: title,
+            overview = hit.str("overview").orEmpty(),
+            poster = hit.str("poster_path")?.let { "https://image.tmdb.org/t/p/w500$it" },
+            backdrop = hit.str("backdrop_path")?.let { "https://image.tmdb.org/t/p/w1280$it" },
+            year = hit.str(if (tv) "first_air_date" else "release_date")?.take(4),
+            rating = hit.str("vote_average")?.toDoubleOrNull()?.takeIf { it > 0 }?.let { "%.1f".format(it) }
+        )
+        return if (details) tmdbDetails(id, tv, basic) ?: basic else basic
+    }
+
+    private suspend fun tmdbDetails(id: Int, tv: Boolean, base: Meta): Meta? {
+        val type = if (tv) "tv" else "movie"
+        val title = base.title
+        val d = tmdbGet("/$type/$id", "append_to_response=credits,external_ids") ?: return null
         var overview = d.str("overview").orEmpty()
         if (overview.isBlank()) {
             overview = runCatching { Http.getJson(tmdbUrl("/$type/$id").first.replace("language=pt-BR", "language=en-US"), tmdbUrl("/$type/$id").second).obj()?.str("overview") }.getOrNull().orEmpty()
@@ -158,7 +181,9 @@ class Metadata(private val context: Context, private val store: Store) {
             runtime = if (tv) d["episode_run_time"].arr()?.firstOrNull()?.toString()?.toIntOrNull() ?: 0 else d.int("runtime"),
             cast = credits?.get("cast").arr().orEmpty().take(6).mapNotNull { it.obj()?.str("name") },
             director = credits?.get("crew").arr().orEmpty().mapNotNull { it.obj() }.firstOrNull { it.str("job") == "Director" }?.str("name"),
-            imdbId = d.str("imdb_id") ?: d["external_ids"].obj()?.str("imdb_id")
+            imdbId = d.str("imdb_id") ?: d["external_ids"].obj()?.str("imdb_id"),
+            imdbRating = base.imdbRating, rotten = base.rotten, metascore = base.metascore,
+            omdbChecked = base.omdbChecked, detailed = true, savedAt = base.savedAt
         )
     }
 

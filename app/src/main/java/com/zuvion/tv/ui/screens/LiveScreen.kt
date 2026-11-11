@@ -45,6 +45,7 @@ import com.zuvion.tv.ui.components.ProgressLine
 import com.zuvion.tv.ui.theme.LocalIsTv
 import com.zuvion.tv.ui.theme.Z
 import com.zuvion.tv.ui.theme.glass
+import com.zuvion.tv.ui.theme.fadeEdges
 
 const val CAT_ALL = "__all"
 const val CAT_FAV = "__fav"
@@ -108,7 +109,7 @@ fun LiveScreen(state: AppState) {
                 when {
                     list == null -> LoadingView()
                     list.isEmpty() -> EmptyView(if (selected == CAT_FAV) "Segure OK sobre um canal para favoritar." else "Nenhum canal nesta categoria.")
-                    else -> LazyColumn(contentPadding = PaddingValues(vertical = 6.dp, horizontal = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    else -> LazyColumn(Modifier.fadeEdges(), contentPadding = PaddingValues(vertical = 18.dp, horizontal = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(list) { c ->
                             ChannelRowItem(state, c, programs.isNotEmpty(), onFocus = { preview = c }) { state.play(c, list) }
                         }
@@ -126,7 +127,7 @@ fun LiveScreen(state: AppState) {
             when {
                 list == null -> LoadingView()
                 list.isEmpty() -> EmptyView(if (selected == CAT_FAV) "Toque longo em um canal para favoritar." else "Nenhum canal nesta categoria.")
-                else -> LazyColumn(contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                else -> LazyColumn(Modifier.fadeEdges(), contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 20.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(list) { c -> ChannelRowItem(state, c, programs.isNotEmpty()) { state.play(c, list) } }
                 }
             }

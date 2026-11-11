@@ -22,7 +22,9 @@ data class Profile(
     val id: String,
     val name: String,
     val color: Long,
-    val kids: Boolean = false
+    val kids: Boolean = false,
+    /** Emoji do avatar; vazio = inicial do nome. */
+    val avatar: String = ""
 )
 
 @Serializable
@@ -113,8 +115,15 @@ data class Settings(
     val introDbKey: String = "",
     val autoSkipIntro: Boolean = false,
     /** Último formato escolhido no player ("Full HD", "4K · H.265"…). */
-    val preferredFormat: String? = null
+    val preferredFormat: String? = null,
+    /** Guia complementar (XMLTV) somado ao do provedor. */
+    val extraEpgUrl: String = "",
+    /** O usuário já criou/confirmou o primeiro perfil. */
+    val profileSetupDone: Boolean = false
 )
+
+/** Guia aberto do Brasil (XMLTV gratuito, ~260 canais). */
+const val OPEN_EPG_BR = "https://epgshare01.online/epgshare01/epg_ripper_BR1.xml.gz"
 
 @Serializable
 data class AppData(

@@ -80,10 +80,11 @@ class ContentRepository(
             val cached = withContext(Dispatchers.IO) { readCache(p.id) }
             if (cached == null) { refreshNow(); return@launch }
             _library.value = cached
+            groups()
             val hours = store.settings.refreshHours
             val age = System.currentTimeMillis() - cached.updatedAt
             if (hours > 0 && age > hours * 3600_000L) refreshNow()
-            else launch(Dispatchers.IO) { epg.load(source?.epgUrl()) }
+            else launch(Dispatchers.IO) { epg.load(epgUrls(source)) }
         }
     }
 
@@ -140,10 +141,11 @@ class ContentRepository(
             } else {
                 val now = System.currentTimeMillis()
                 _library.update { it.copy(categories = catMap, items = itemMap, loading = false, error = null, updatedAt = now) }
+                groups()
                 withContext(Dispatchers.IO) { writeCache(p.id, catMap, itemMap, now) }
                 store.updateSettings { it.copy(libraryUpdated = it.libraryUpdated + (p.id to now)) }
                 step("EPG", StepState.LOADING)
-                val n = withContext(Dispatchers.IO) { epg.load(src.epgUrl(), force = true) }
+                val n = withContext(Dispatchers.IO) { epg.load(epgUrls(src), force = true) }
                 step("EPG", if (n >= 0) StepState.OK else StepState.FAILED, n.coerceAtLeast(0))
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -154,6 +156,11 @@ class ContentRepository(
             _library.update { it.copy(refreshing = false) }
         }
     }
+
+    private fun epgUrls(src: IptvSource?): List<String> = listOfNotNull(src?.epgUrl(), store.settings.extraEpgUrl.takeIf { it.isNotBlank() })
+
+    /** Recarrega só o guia (ao mudar o guia complementar). */
+    fun reloadEpg() { scope.launch(Dispatchers.IO) { epg.load(epgUrls(source), force = false) } }
 
     private fun readCache(id: String): Library? = runCatching {
         val f = cacheFile(id)
@@ -193,13 +200,18 @@ class ContentRepository(
     private var groupIndex: Map<String, List<Content>> = emptyMap()
     private var groupIndexOf: Library? = null
 
+    @Volatile private var indexJob: Job? = null
+
+    /** Monta o índice em segundo plano; enquanto não fica pronto, cada item vale por si. */
     private fun groups(): Map<String, List<Content>> {
         val lib = _library.value
-        if (groupIndexOf !== lib) {
-            groupIndex = (lib.items[Kind.LIVE].orEmpty() + lib.items[Kind.MOVIE].orEmpty()).groupBy { Variants.key(it) }
-            groupIndexOf = lib
+        if (groupIndexOf !== lib && lib.items.isNotEmpty() && indexJob?.isActive != true) {
+            indexJob = scope.launch(Dispatchers.Default) {
+                val idx = (lib.items[Kind.LIVE].orEmpty() + lib.items[Kind.MOVIE].orEmpty()).groupBy { Variants.key(it) }
+                synchronized(this@ContentRepository) { groupIndex = idx; groupIndexOf = lib }
+            }
         }
-        return groupIndex
+        return if (groupIndexOf === lib) groupIndex else emptyMap()
     }
 
     private val preferred get() = store.settings.preferredFormat
@@ -217,7 +229,9 @@ class ContentRepository(
 
     fun categories(kind: Kind): List<Category> = _library.value.categories[kind].orEmpty().filter { allowed(it) }
 
-    suspend fun itemsIn(kind: Kind, categoryId: String?): List<Content> {
+    suspend fun itemsIn(kind: Kind, categoryId: String?): List<Content> = withContext(Dispatchers.Default) { itemsInImpl(kind, categoryId) }
+
+    private suspend fun itemsInImpl(kind: Kind, categoryId: String?): List<Content> {
         val lib = _library.value
         val all = lib.items[kind].orEmpty()
         val catById = lib.categories[kind].orEmpty().associateBy { it.id }
@@ -229,7 +243,9 @@ class ContentRepository(
         }
     }
 
-    fun search(query: String): List<Content> {
+    suspend fun search(query: String): List<Content> = withContext(Dispatchers.Default) { searchImpl(query) }
+
+    private fun searchImpl(query: String): List<Content> {
         val q = query.trim().lowercase()
         if (q.length < 2) return emptyList()
         val lib = _library.value

@@ -36,7 +36,6 @@ jobs:
           ZUVION_KEY_ALIAS: ${{ secrets.ZUVION_KEY_ALIAS }}
           ZUVION_KEY_PASSWORD: ${{ secrets.ZUVION_KEY_PASSWORD }}
           ZUVION_TMDB_KEY: ${{ secrets.ZUVION_TMDB_KEY }}
-          ZUVION_OMDB_KEY: ${{ secrets.ZUVION_OMDB_KEY }}
           ZUVION_INTRODB_KEY: ${{ secrets.ZUVION_INTRODB_KEY }}
         run: |
           V="${GITHUB_REF_NAME#v}"

@@ -49,6 +49,8 @@ import com.zuvion.tv.ui.theme.LocalIsTv
 import com.zuvion.tv.ui.theme.Z
 import com.zuvion.tv.ui.theme.glass
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import com.zuvion.tv.data.OPEN_EPG_BR
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -80,9 +82,6 @@ private fun ToggleRow(label: String, value: Boolean, onChange: (Boolean) -> Unit
     }
 }
 
-/** Pix estático (BR Code) para doações. */
-private const val PIX_KEY = "ac6ffef1-a34a-4877-be9d-83cc7ee355d4"
-private const val PIX_CODE = "00020126580014br.gov.bcb.pix0136ac6ffef1-a34a-4877-be9d-83cc7ee355d45204000053039865802BR5916WARRENO HENDRICK6015APARECIDA DE GO62120508ZUVIONTV63043A12"
 
 @Composable
 private fun KeyRow(label: String, value: String, hint: String, builtIn: Boolean, onClick: () -> Unit) {
@@ -180,10 +179,10 @@ fun SettingsScreen(state: AppState) {
             Section("Capas e sinopses") {
                 Text("Capas, sinopses e elenco vêm do TMDB; o servidor IPTV só é usado se o TMDB não encontrar. " +
                     "O OMDb acrescenta notas do IMDb e Rotten Tomatoes. O TheIntroDB mostra o botão “Pular abertura”. " +
-                    "O app já vem com chaves; se quiser, use as suas.",
+                    "TMDB e TheIntroDB já vêm configurados. O OMDb tem limite diário de consultas, então precisa da sua própria chave (gratuita).",
                     color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
                 KeyRow("TMDB", s.tmdbKey, "themoviedb.org → Configurações → API", BuildConfig.TMDB_KEY.isNotEmpty()) { keyEdit = "tmdb" }
-                KeyRow("OMDb", s.omdbKey, "omdbapi.com/apikey.aspx", BuildConfig.OMDB_KEY.isNotEmpty()) { keyEdit = "omdb" }
+                KeyRow("OMDb", s.omdbKey, "omdbapi.com/apikey.aspx", false) { keyEdit = "omdb" }
                 KeyRow("TheIntroDB", s.introDbKey, "theintrodb.org", true) { keyEdit = "intro" }
                 ToggleRow("Pular aberturas automaticamente", s.autoSkipIntro) { v -> state.store.updateSettings { it.copy(autoSkipIntro = v) } }
             }
@@ -236,44 +235,28 @@ fun SettingsScreen(state: AppState) {
         }
 
         item {
-            Section("Apoie o Zuvion TV") {
-                Text("O Zuvion TV é gratuito e sem anúncios. Se ele faz parte da sua rotina, considere apoiar com uma doação via Pix, de qualquer valor.",
+            Section("Guia de programação") {
+                Text("Complete o guia do seu provedor com um guia aberto e gratuito, que tem a grade completa de cerca de 260 canais brasileiros.",
                     color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    val qr = remember { qrBitmap(PIX_CODE, 360) }
-                    Box(Modifier.background(Color.White, RoundedCornerShape(18.dp)).padding(10.dp)) {
-                        Image(qr, "QR Code Pix para doação", Modifier.size(if (tv) 170.dp else 150.dp), filterQuality = FilterQuality.None)
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Pix · chave aleatória", color = Z.Text, style = MaterialTheme.typography.titleMedium)
-                        Text(PIX_KEY, color = Z.Muted, style = MaterialTheme.typography.labelMedium)
-                        Text("Wárreno Hendrick", color = Z.Faint, style = MaterialTheme.typography.labelMedium)
-                        if (!tv) {
-                            val clip = LocalClipboardManager.current
-                            PillButton("Copiar Pix copia e cola", {
-                                clip.setText(AnnotatedString(PIX_CODE)); state.showToast("Código Pix copiado")
-                            }, icon = Icons.Outlined.ContentCopy, primary = true)
-                        } else {
-                            Text("Aponte a câmera do app do seu banco para o QR Code.", color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
+                ToggleRow("Usar o guia aberto do Brasil", s.extraEpgUrl == OPEN_EPG_BR) { v ->
+                    state.store.updateSettings { it.copy(extraEpgUrl = if (v) OPEN_EPG_BR else "") }
+                    state.repo.reloadEpg()
+                    state.showToast(if (v) "Carregando o guia aberto…" else "Guia aberto desligado")
                 }
+                Text("Para usar outro guia XMLTV na sua lista, toque em EPG em Listas IPTV.", color = Z.Faint, style = MaterialTheme.typography.labelMedium)
             }
         }
 
         item {
-            Section("Sobre") {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Logo(48.dp)
-                    Column {
-                        Wordmark(20)
-                        Text("Sua TV, seu universo", color = Z.Muted, style = MaterialTheme.typography.labelMedium)
+            Focusable({ state.push(Screen.About) }, Modifier.fillMaxWidth(), RoundedCornerShape(26.dp), focusScale = 1.01f) {
+                Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Logo(44.dp)
+                    Column(Modifier.weight(1f)) {
+                        Text("Sobre e apoio", style = MaterialTheme.typography.titleLarge, color = Z.Text)
+                        Text("Versão ${BuildConfig.VERSION_NAME}, créditos e doação via Pix", color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
                     }
+                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = Z.Muted)
                 }
-                Text("Versão ${BuildConfig.VERSION_NAME}", color = Z.Muted, style = MaterialTheme.typography.labelMedium)
-                Text("O Zuvion TV é um player: não fornece canais nem conteúdo. Use apenas listas às quais você tem direito.", color = Z.Faint, style = MaterialTheme.typography.labelMedium)
-                Text("Capas e sinopses: TMDB, OMDb e TheIntroDB. Este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB.", color = Z.Faint, style = MaterialTheme.typography.labelMedium)
-                Text("© ${java.util.Calendar.getInstance().get(java.util.Calendar.YEAR).coerceAtLeast(2026)} Wárreno Hendrick. Todos os direitos reservados.", color = Z.Text, style = MaterialTheme.typography.labelLarge)
             }
         }
     }

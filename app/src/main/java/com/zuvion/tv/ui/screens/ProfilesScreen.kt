@@ -1,5 +1,11 @@
 package com.zuvion.tv.ui.screens
 
+import androidx.compose.material.icons.outlined.Check
+
+import androidx.compose.material.icons.outlined.Edit
+
+import androidx.compose.foundation.layout.PaddingValues
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,12 +45,16 @@ import com.zuvion.tv.ui.components.Wordmark
 import com.zuvion.tv.ui.theme.Z
 import java.util.UUID
 
+/** Avatares disponíveis (emoji: leves e funcionam em qualquer Android). */
+val profileAvatars = listOf("", "🙂", "😎", "🦊", "🐼", "🐱", "🦁", "🐶", "🚀", "⭐", "🎮", "🎬", "⚽", "🦄", "👾", "🌙")
+
 private val profileColors = listOf(0xFFFF8FA8, 0xFF8FE6F2, 0xFFB9AEFF, 0xFFFFC46B, 0xFF7EE0A8, 0xFF6E8BFF)
 
 @Composable
 fun ProfileAvatar(p: Profile, size: Int) {
     Box(Modifier.size(size.dp).background(Color(p.color), CircleShape), contentAlignment = Alignment.Center) {
-        Text(p.name.take(1).uppercase(), color = Z.Ink, fontWeight = FontWeight.Bold, fontSize = (size * 0.42f).sp)
+        if (p.avatar.isNotEmpty()) Text(p.avatar, fontSize = (size * 0.46f).sp)
+        else Text(p.name.take(1).uppercase(), color = Z.Ink, fontWeight = FontWeight.Bold, fontSize = (size * 0.42f).sp)
     }
 }
 
@@ -53,6 +63,7 @@ fun ProfilesScreen(state: AppState) {
     val data by state.store.data.collectAsState()
     var editing by remember { mutableStateOf<Profile?>(null) }
     var pinFor by remember { mutableStateOf<Profile?>(null) }
+    var manage by remember { mutableStateOf(false) }
 
     fun enter(p: Profile) {
         state.store.updateSettings { it.copy(activeProfileId = p.id) }
@@ -67,31 +78,42 @@ fun ProfilesScreen(state: AppState) {
     ) {
         Wordmark(28)
         Text("Quem está assistindo?", style = MaterialTheme.typography.displaySmall, color = Z.Text, modifier = Modifier.padding(top = 18.dp, bottom = 32.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+        Text(if (manage) "Escolha o perfil que deseja editar." else " ", color = Z.Muted, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 8.dp))
+        // contentPadding evita cortar o anel de foco (o item cresce ao ser selecionado)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(24.dp), contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)) {
             items(data.profiles, key = { it.id }) { p ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Focusable(
                         onClick = {
+                            if (manage) { editing = p; return@Focusable }
                             // Sair do perfil infantil exige PIN, se houver
                             val cur = state.store.activeProfile
                             if (cur?.kids == true && !p.kids && state.store.settings.parentalPin != null && cur.id != p.id) pinFor = p else enter(p)
                         },
                         onLongClick = { editing = p },
-                        shape = CircleShape, focusScale = 1.1f
-                    ) { ProfileAvatar(p, 110) }
+                        shape = CircleShape, focusScale = 1.08f, glass = false
+                    ) {
+                        ProfileAvatar(p, 110)
+                        if (manage) Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.45f), CircleShape), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Outlined.Edit, "Editar", tint = Color.White, modifier = Modifier.size(36.dp))
+                        }
+                    }
                     Text(p.name + if (p.kids) " · Kids" else "", color = Z.Text, style = MaterialTheme.typography.titleMedium)
                 }
             }
             item {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Focusable({ editing = Profile(UUID.randomUUID().toString(), "", profileColors[data.profiles.size % profileColors.size]) }, Modifier.size(110.dp), CircleShape, focusScale = 1.1f) {
+                    Focusable({ editing = Profile(UUID.randomUUID().toString(), "", profileColors[data.profiles.size % profileColors.size]) }, Modifier.size(110.dp), CircleShape, focusScale = 1.08f) {
                         Icon(Icons.Outlined.Add, "Adicionar perfil", tint = Z.Text, modifier = Modifier.align(Alignment.Center).size(40.dp))
                     }
                     Text("Adicionar", color = Z.Muted, style = MaterialTheme.typography.titleMedium)
                 }
             }
         }
-        Text("Toque longo (ou segure OK) para editar um perfil.", color = Z.Faint, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 28.dp))
+        Row(Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            PillButton(if (manage) "Concluído" else "Gerenciar perfis", { manage = !manage }, icon = if (manage) Icons.Outlined.Check else Icons.Outlined.Edit, primary = manage)
+            if (state.stack.size > 1) PillButton("Voltar", { state.pop() })
+        }
     }
 
     editing?.let { p -> ProfileEditor(state, p, canDelete = data.profiles.size > 1 && data.profiles.any { it.id == p.id }) { editing = null } }
@@ -103,13 +125,26 @@ fun ProfilesScreen(state: AppState) {
 }
 
 @Composable
-fun ProfileEditor(state: AppState, initial: Profile, canDelete: Boolean, onDone: () -> Unit) {
+fun ProfileEditor(state: AppState, initial: Profile, canDelete: Boolean, title: String? = null, onSaved: () -> Unit = {}, onDone: () -> Unit) {
     var name by remember { mutableStateOf(initial.name) }
+    var avatar by remember { mutableStateOf(initial.avatar) }
     var kids by remember { mutableStateOf(initial.kids) }
     var color by remember { mutableStateOf(initial.color) }
     GlassDialog(onDone) {
-        Text(if (initial.name.isBlank()) "Novo perfil" else "Editar perfil", style = MaterialTheme.typography.headlineMedium, color = Z.Text)
-        GlassField("Nome", name, { name = it.take(20) })
+        Text(title ?: if (initial.name.isBlank()) "Novo perfil" else "Editar perfil", style = MaterialTheme.typography.headlineMedium, color = Z.Text)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            ProfileAvatar(initial.copy(name = name.ifBlank { "?" }, color = color, avatar = avatar), 64)
+            GlassField("Nome", name, { name = it.take(20) }, Modifier.weight(1f), last = true)
+        }
+        Text("Avatar", color = Z.Muted, style = MaterialTheme.typography.labelLarge)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(6.dp)) {
+            items(profileAvatars) { a ->
+                Focusable({ avatar = a }, Modifier.size(48.dp), CircleShape, glass = a != avatar, selected = a == avatar, fill = if (a == avatar) Z.Violet.copy(alpha = 0.35f) else null, focusScale = 1.12f) {
+                    Text(a.ifEmpty { name.take(1).uppercase().ifEmpty { "A" } }, fontSize = 22.sp, color = Z.Text, modifier = Modifier.align(Alignment.Center))
+                }
+            }
+        }
+        Text("Cor", color = Z.Muted, style = MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             profileColors.forEach { c ->
                 Focusable({ color = c }, Modifier.size(40.dp), CircleShape, glass = false, focusScale = 1.15f) {
@@ -125,10 +160,10 @@ fun ProfileEditor(state: AppState, initial: Profile, canDelete: Boolean, onDone:
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             PillButton("Salvar", {
-                if (name.isNotBlank()) { state.store.saveProfile(initial.copy(name = name.trim(), kids = kids, color = color)); onDone() }
+                if (name.isNotBlank()) { state.store.saveProfile(initial.copy(name = name.trim(), kids = kids, color = color, avatar = avatar)); onSaved(); onDone() }
             }, Modifier.weight(1f), primary = true)
             if (canDelete) PillButton("Excluir", { state.store.removeProfile(initial.id); onDone() }, Modifier.weight(1f))
-            PillButton("Cancelar", onDone, Modifier.weight(1f))
+            if (title == null) PillButton("Cancelar", onDone, Modifier.weight(1f))
         }
     }
 }

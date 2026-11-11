@@ -87,8 +87,15 @@ fun HomeScreen(state: AppState) {
 
     val movies = lib.items[Kind.MOVIE].orEmpty()
     val series = lib.items[Kind.SERIES].orEmpty()
-    val recentMovies = remember(movies) { com.zuvion.tv.data.Variants.dedupe(movies.sortedByDescending { it.added }, state.store.settings.preferredFormat).take(30) }
-    val recentSeries = remember(series) { series.sortedByDescending { it.added }.take(30) }
+    // Ordenar dezenas de milhares de itens fora da thread da interface.
+    val recentMovies by produceState(emptyList<Content>(), movies) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            com.zuvion.tv.data.Variants.dedupe(movies.sortedByDescending { it.added }.take(150), state.store.settings.preferredFormat).take(30)
+        }
+    }
+    val recentSeries by produceState(emptyList<Content>(), series) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { series.sortedByDescending { it.added }.take(30) }
+    }
     val history = pd.history.filter { it.item.playlistId == pid }
     val cont = history.filter { it.item.kind != Kind.LIVE }
     val favChannels = pd.favorites.filter { it.playlistId == pid && it.kind == Kind.LIVE }
@@ -184,7 +191,7 @@ private fun HomeHeader(state: AppState, multiProfile: Boolean) {
                 Clock()
             }
             if (profile != null) {
-                Focusable({ if (multiProfile) state.push(Screen.Profiles) else state.tab = Tab.SETTINGS }, shape = CircleShape, focusScale = 1.1f, glass = false) {
+                Focusable({ state.push(Screen.Profiles) }, shape = CircleShape, focusScale = 1.08f, glass = false) {
                     ProfileAvatar(profile, 40)
                 }
             }

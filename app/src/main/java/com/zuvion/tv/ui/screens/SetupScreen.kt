@@ -1,5 +1,21 @@
 package com.zuvion.tv.ui.screens
 
+import androidx.compose.ui.draw.clip
+
+import androidx.compose.foundation.layout.heightIn
+
+import androidx.compose.foundation.layout.Box
+
+import androidx.compose.foundation.border
+
+import androidx.compose.foundation.background
+
+import androidx.compose.ui.focus.onFocusChanged
+
+import androidx.compose.ui.graphics.SolidColor
+
+import androidx.compose.foundation.text.BasicTextField
+
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -85,36 +101,52 @@ fun GlassField(
     onDone: (() -> Unit)? = null
 ) {
     val focus = LocalFocusManager.current
-    OutlinedTextField(
-        value = value, onValueChange = onChange, label = { Text(label) },
-        placeholder = { Text(placeholder, color = Z.Faint) },
-        singleLine = true,
-        visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = if (password && keyboard == KeyboardType.Text) KeyboardType.Password else keyboard,
-            imeAction = if (last) ImeAction.Done else ImeAction.Next
-        ),
-        keyboardActions = KeyboardActions(
-            onNext = { focus.moveFocus(FocusDirection.Down) },
-            onDone = { focus.clearFocus(); onDone?.invoke() }
-        ),
-        shape = RoundedCornerShape(16.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Z.Violet, unfocusedBorderColor = Z.Tint.copy(alpha = 0.18f),
-            focusedContainerColor = Z.Tint.copy(alpha = 0.08f), unfocusedContainerColor = Z.Tint.copy(alpha = 0.05f),
-            focusedLabelColor = Z.Violet, unfocusedLabelColor = Z.Muted, cursorColor = Z.Violet,
-            focusedTextColor = Z.Text, unfocusedTextColor = Z.Text
-        ),
-        // No controle remoto, ▲/▼ saem do campo (alguns Google TV prendem o foco no texto).
-        modifier = modifier.fillMaxWidth().onPreviewKeyEvent { ev ->
-            if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-            when (ev.key) {
-                Key.DirectionDown -> focus.moveFocus(FocusDirection.Down)
-                Key.DirectionUp -> focus.moveFocus(FocusDirection.Up)
-                else -> false
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(16.dp)
+    // Campo de vidro próprio: rótulo acima (como no protótipo) e sem o recorte do Material,
+    // que deixava uma faixa clara atrás do texto em algumas telas.
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (label.isNotEmpty()) Text(label, style = MaterialTheme.typography.labelMedium, color = if (focused) Z.Violet else Z.Muted)
+        BasicTextField(
+            value = value, onValueChange = onChange,
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Z.Text),
+            cursorBrush = SolidColor(Z.Violet),
+            visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = if (password && keyboard == KeyboardType.Text) KeyboardType.Password else keyboard,
+                imeAction = if (last) ImeAction.Done else ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { focus.moveFocus(FocusDirection.Down) },
+                onDone = { focus.clearFocus(); onDone?.invoke() }
+            ),
+            // No controle remoto, ▲/▼ saem do campo (alguns Google TV prendem o foco no texto).
+            modifier = Modifier.fillMaxWidth()
+                .onFocusChanged { focused = it.isFocused }
+                .onPreviewKeyEvent { ev ->
+                    if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (ev.key) {
+                        Key.DirectionDown -> focus.moveFocus(FocusDirection.Down)
+                        Key.DirectionUp -> focus.moveFocus(FocusDirection.Up)
+                        else -> false
+                    }
+                },
+            decorationBox = { inner ->
+                Box(
+                    Modifier.fillMaxWidth().heightIn(min = 52.dp)
+                        .clip(shape)
+                        .background(Z.Tint.copy(alpha = if (focused) 0.09f else 0.05f))
+                        .border(if (focused) 2.dp else 1.dp, if (focused) Z.Violet else Z.Tint.copy(alpha = 0.16f), shape)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    if (value.isEmpty() && placeholder.isNotEmpty()) Text(placeholder, color = Z.Faint, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+                    inner()
+                }
             }
-        }
-    )
+        )
+    }
 }
 
 private fun randomMac() = "00:1A:79:" + (1..3).joinToString(":") { "%02X".format(Random.nextInt(256)) }

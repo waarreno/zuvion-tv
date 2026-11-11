@@ -22,16 +22,26 @@ Player IPTV gratuito para <b>celular</b> e <b>Android TV / Google TV</b>, com vi
 |---|---|---|
 | <img src="docs/screenshots/celular-login.png" width="260"> | <img src="docs/screenshots/celular-inicio.png" width="260"> | <img src="docs/screenshots/tv-atualizacao.png" width="420"> |
 
-*Imagens do protótipo de design, com conteúdo de exemplo.*
+### Modo claro
+
+| TV · Início | TV · Guia de programação |
+|---|---|
+| ![Início no modo claro](docs/screenshots/tv-inicio-claro.png) | ![Guia no modo claro](docs/screenshots/tv-guia-claro.png) |
+
+| Celular · Entrar | Celular · Início |
+|---|---|
+| <img src="docs/screenshots/celular-login-claro.png" width="260"> | <img src="docs/screenshots/celular-inicio-claro.png" width="260"> |
+
+*Imagens do protótipo de design, com conteúdo de exemplo. O tema é escolhido em Configurações → Aparência (automático, escuro ou claro).*
 
 ## O que ele faz
 
 - **Funciona com a sua lista:** Xtream Codes, link M3U/M3U8, arquivo M3U do aparelho e portal MAC (Stalker).
 - **TV ao vivo, filmes e séries:** categorias, busca, favoritos e "continuar assistindo".
 - **Guia de programação (EPG)** em grade, com **replay** (assistir do início) quando o provedor oferece.
-- **Capas e sinopses do TMDB**, com notas do IMDb e do Rotten Tomatoes pelo OMDb, já configurados.
+- **Capas e sinopses do TMDB**, já configuradas, e notas do IMDb e do Rotten Tomatoes pelo OMDb (com sua chave gratuita).
 - **Pular abertura** em séries e filmes, pelo TheIntroDB.
-- **Perfis**, perfil infantil e **PIN** para conteúdo adulto.
+- **Perfis** com nome, avatar e cor, perfil infantil e **PIN** para conteúdo adulto.
 - **Multi-tela:** até 4 canais ao mesmo tempo.
 - **Gravação** do programa ao vivo.
 - **Tema claro ou escuro.**
@@ -67,7 +77,7 @@ O mesmo APK funciona em celulares, tablets, TV boxes e Google TV com processador
 
 ### Capas e sinopses
 
-O app já vem pronto para buscar capas, sinopses e notas. Se preferir usar as suas próprias chaves (gratuitas), coloque-as em **Configurações → Capas e sinopses**:
+O app já vem pronto para buscar capas e sinopses (TMDB) e pular aberturas (TheIntroDB). As notas do IMDb e do Rotten Tomatoes vêm do OMDb, que limita as consultas por dia; para ativá-las, crie sua chave gratuita e coloque em **Configurações → Capas e sinopses**. Você também pode usar suas próprias chaves do TMDB e do TheIntroDB:
 
 | Serviço | Para que serve | Onde conseguir |
 |---|---|---|
@@ -91,7 +101,7 @@ O app já vem pronto para buscar capas, sinopses e notas. Se preferir usar as su
 
 **Um canal não abre.** Toque no botão de trocar o motor de vídeo (ExoPlayer ↔ VLC) no player. Em **Configurações → Player** você também pode trocar o formato dos canais entre MPEG-TS e HLS.
 
-**O guia está vazio.** Nem todo provedor envia o guia. Em **Configurações → Listas IPTV → EPG**, você pode informar uma URL XMLTV própria.
+**O guia está vazio ou incompleto.** Nem todo provedor envia o guia. Em **Configurações → Guia de programação**, ligue o **guia aberto do Brasil** (grade completa de cerca de 260 canais). Em **Listas IPTV → EPG** você também pode informar uma URL XMLTV própria.
 
 **A lista não mudou depois que o provedor adicionou canais.** Use **Atualizar lista agora**.
 
@@ -104,7 +114,7 @@ O Zuvion TV é gratuito e sem anúncios. Se ele faz parte da sua rotina, conside
 **Chave Pix (aleatória):** `ac6ffef1-a34a-4877-be9d-83cc7ee355d4`
 Recebedor: Wárreno Hendrick
 
-O QR Code também aparece no app, em **Configurações → Apoie o Zuvion TV**.
+O QR Code também aparece no app, em **Configurações → Sobre e apoio**.
 
 ## Privacidade
 

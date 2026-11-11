@@ -32,8 +32,15 @@ object Variants {
         when { legRx.containsMatchIn(name) -> "Legendado"; dubRx.containsMatchIn(name) -> "Dublado"; else -> null }
     ).joinToString(" · ")
 
+    // Cache: os mesmos nomes são consultados a cada rolagem da lista.
+    private val displayCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val keyCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     /** Nome sem as marcas de formato: "HBO 2 [FHD][H265]" -> "HBO 2". */
-    fun displayName(name: String): String {
+    fun displayName(name: String): String =
+        displayCache[name] ?: computeDisplay(name).also { if (displayCache.size < 200_000) displayCache[name] = it }
+
+    private fun computeDisplay(name: String): String {
         var t = name
         listOf(qualityRx, codecRx, h264Rx, extraRx, legRx, dubRx).forEach { t = t.replace(it, " ") }
         t = t.replace(emptyBracketsRx, " ").replace(trailingSepRx, "").replace(spacesRx, " ").trim()
@@ -48,12 +55,12 @@ object Variants {
     private val nonAlnumRx = Regex("[^a-z0-9]+")
 
     /** Chave do grupo: nome sem formato, sem acentos/pontuação. */
-    fun key(c: Content): String {
-        val n = java.text.Normalizer.normalize(displayName(c.name).lowercase(), java.text.Normalizer.Form.NFD)
+    fun key(c: Content): String = "${c.kind}|" + (keyCache[c.name] ?: computeKey(c.name).also { if (keyCache.size < 200_000) keyCache[c.name] = it })
+
+    private fun computeKey(name: String): String =
+        java.text.Normalizer.normalize(displayName(name).lowercase(), java.text.Normalizer.Form.NFD)
             .replace(marksRx, "")
             .replace(nonAlnumRx, " ").trim()
-        return "${c.kind}|$n"
-    }
 
     private fun qualityRank(q: String) = when (q) { "Full HD" -> 0; "HD" -> 1; "" -> 2; "4K" -> 3; else -> 4 }
 

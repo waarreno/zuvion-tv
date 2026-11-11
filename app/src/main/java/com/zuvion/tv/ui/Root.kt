@@ -102,6 +102,7 @@ fun Root(state: AppState) {
         when (val s = state.current) {
             Screen.Setup -> SetupScreen(state)
             Screen.Profiles -> ProfilesScreen(state)
+            Screen.About -> com.zuvion.tv.ui.screens.AboutScreen(state)
             Screen.Main -> MainShell(state)
             is Screen.MovieDetail -> MovieDetailScreen(state, s.item)
             is Screen.SeriesDetail -> SeriesDetailScreen(state, s.item)
@@ -119,6 +120,16 @@ fun Root(state: AppState) {
         val onMain = state.current == Screen.Main || state.current == Screen.Profiles
         AnimatedVisibility(showProgress && onMain && lib.steps.isNotEmpty(), enter = fadeIn(), exit = fadeOut()) {
             LoadProgressScreen(state, lib.steps)
+        }
+
+        // Primeiro uso: o usuário cria o próprio perfil (nome, avatar, cor) em vez de um "Principal" automático.
+        if (!splash && state.current == Screen.Main && !data.settings.profileSetupDone && data.playlists.isNotEmpty()) {
+            state.store.activeProfile?.let { p ->
+                com.zuvion.tv.ui.screens.ProfileEditor(
+                    state, p.copy(name = if (p.name == "Principal") "" else p.name), canDelete = false, title = "Crie seu perfil",
+                    onSaved = { state.store.updateSettings { it.copy(profileSetupDone = true) } }
+                ) { }
+            }
         }
 
         val upd by state.updater.state.collectAsState()
@@ -185,8 +196,8 @@ private fun NavRail(state: AppState) {
     ) {
         Logo(44.dp)
         Spacer(Modifier.height(14.dp))
-        Tab.entries.forEach { t ->
-            if (t == Tab.SETTINGS) Spacer(Modifier.weight(1f))
+        // Configurações ficam na engrenagem do topo da tela inicial (sem item extra no menu).
+        Tab.entries.filter { it != Tab.SETTINGS }.forEach { t ->
             val selected = state.tab == t
             Focusable(
                 onClick = { state.tab = t },

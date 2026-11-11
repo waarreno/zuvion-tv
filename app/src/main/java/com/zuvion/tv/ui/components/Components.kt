@@ -187,7 +187,7 @@ fun rememberMetaPoster(item: Content): String? {
     val p by produceState(app.meta.cached(item)?.poster, item.key) {
         if (app.meta.enabled) app.meta.forContent(item)?.poster?.let { value = it }
     }
-    return p ?: item.poster
+    return p?.replace("/w500/", "/w342/") ?: item.poster
 }
 
 /** Cartaz vertical (filmes/séries). */

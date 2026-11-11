@@ -35,6 +35,7 @@ sealed interface Screen {
     data object Main : Screen
     data object Setup : Screen
     data object Profiles : Screen
+    data object About : Screen
     data class MovieDetail(val item: Content) : Screen
     data class SeriesDetail(val item: Content) : Screen
     data class Player(

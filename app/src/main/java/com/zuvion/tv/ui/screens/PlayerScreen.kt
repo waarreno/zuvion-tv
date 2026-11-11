@@ -217,6 +217,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
     var showTracks by remember { mutableStateOf(false) }
     var showInfo by remember { mutableStateOf(false) }
     val rootFr = remember { FocusRequester() }
+    val swallowOk = remember { booleanArrayOf(false) }
     val playFr = remember { FocusRequester() }
     val panelOpen = showChannels || showTracks || showInfo
 
@@ -259,6 +260,12 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
             .fillMaxSize()
             .background(Color.Black)
             .onPreviewKeyEvent { ev ->
+                val isOk = ev.key.nativeKeyCode.let { it == AKeyEvent.KEYCODE_DPAD_CENTER || it == AKeyEvent.KEYCODE_ENTER || it == AKeyEvent.KEYCODE_NUMPAD_ENTER }
+                // O OK que só abriu os controles não pode "clicar" no botão de pausa ao ser solto.
+                if (ev.type == KeyEventType.KeyUp) {
+                    if (isOk && swallowOk[0]) { swallowOk[0] = false; return@onPreviewKeyEvent true }
+                    return@onPreviewKeyEvent false
+                }
                 if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 bump++
                 val code = ev.key.nativeKeyCode
@@ -270,14 +277,14 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                     AKeyEvent.KEYCODE_MEDIA_REWIND -> { engine.seekBy(-30_000); true }
                     AKeyEvent.KEYCODE_BACK -> if (overlay && !panelOpen) { overlay = false; true } else false
                     else -> if (!overlay && !panelOpen && (inIntro || inCredits) &&
-                        (code == AKeyEvent.KEYCODE_DPAD_CENTER || code == AKeyEvent.KEYCODE_ENTER)) { doSkip(); true }
+                        (code == AKeyEvent.KEYCODE_DPAD_CENTER || code == AKeyEvent.KEYCODE_ENTER)) { swallowOk[0] = true; doSkip(); true }
                     else if (!overlay && !panelOpen) {
                         when (code) {
                             AKeyEvent.KEYCODE_DPAD_UP -> { if (isLive) zap(-1) else overlay = true; true }
                             AKeyEvent.KEYCODE_DPAD_DOWN -> { if (isLive) zap(1) else overlay = true; true }
                             AKeyEvent.KEYCODE_DPAD_LEFT -> { if (isLive) showChannels = true else engine.seekBy(-10_000); true }
                             AKeyEvent.KEYCODE_DPAD_RIGHT -> { if (!isLive) engine.seekBy(10_000) else overlay = true; true }
-                            AKeyEvent.KEYCODE_DPAD_CENTER, AKeyEvent.KEYCODE_ENTER, AKeyEvent.KEYCODE_MENU -> { overlay = true; true }
+                            AKeyEvent.KEYCODE_DPAD_CENTER, AKeyEvent.KEYCODE_ENTER, AKeyEvent.KEYCODE_NUMPAD_ENTER, AKeyEvent.KEYCODE_MENU -> { swallowOk[0] = isOk; overlay = true; true }
                             else -> false
                         }
                     } else false
