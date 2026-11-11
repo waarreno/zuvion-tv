@@ -242,9 +242,27 @@ private fun TabContent(state: AppState) {
 @Composable
 fun MainShell(state: AppState) {
     if (LocalIsTv.current) {
+        // Se a aba mudou por um botão do conteúdo (engrenagem, avatar…), o foco segue para a nova aba
+        // em vez de cair no primeiro ícone do menu. Se mudou pelo menu, o foco fica no menu.
+        val contentFr = remember { FocusRequester() }
+        var contentFocusLostAt by remember { mutableStateOf(0L) }
+        var contentHasFocus by remember { mutableStateOf(false) }
+        LaunchedEffect(state.tab) {
+            if (System.currentTimeMillis() - contentFocusLostAt < 400) {
+                delay(150)
+                runCatching { contentFr.requestFocus() }
+            }
+        }
         Row(Modifier.fillMaxSize()) {
             NavRail(state)
-            Box(Modifier.fillMaxSize().padding(start = 8.dp)) { TabContent(state) }
+            Box(
+                Modifier.fillMaxSize().padding(start = 8.dp)
+                    .onFocusChanged {
+                        if (contentHasFocus && !it.hasFocus) contentFocusLostAt = System.currentTimeMillis()
+                        contentHasFocus = it.hasFocus
+                    }
+                    .focusRequester(contentFr).focusGroup()
+            ) { TabContent(state) }
         }
     } else {
         // A barra fica abaixo do conteúdo (não sobrepõe cartazes nem listas).

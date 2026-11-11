@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.zuvion.tv.data.Content
+import com.zuvion.tv.data.title
 import com.zuvion.tv.data.EpgProgram
 import com.zuvion.tv.data.Kind
 import com.zuvion.tv.ui.AppState
@@ -97,7 +98,7 @@ fun GuideScreen(state: AppState) {
                         p.end < System.currentTimeMillis() -> if (c.catchupDays > 0) "REPLAY DISPONÍVEL" else "JÁ EXIBIDO"
                         else -> "EM BREVE"
                     }
-                    Text("${c.name.uppercase()} · $tag", style = MaterialTheme.typography.labelSmall, color = Z.Cyan, maxLines = 1)
+                    Text("${c.title.uppercase()} · $tag", style = MaterialTheme.typography.labelSmall, color = Z.Cyan, maxLines = 1)
                     Text(p.title, style = MaterialTheme.typography.headlineMedium, color = Z.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("${fmt.format(Date(p.start))} – ${fmt.format(Date(p.end))}" + if (p.desc.isNotBlank()) " · ${p.desc}" else "",
                         color = Z.Muted, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -153,7 +154,7 @@ private fun GuideRow(
         Focusable({ state.play(c, all) }, Modifier.width(if (tv) 194.dp else 114.dp).fillMaxHeight(), RoundedCornerShape(14.dp), focusScale = 1.02f) {
             Row(Modifier.padding(horizontal = 8.dp).align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ChannelLogo(c, 34.dp)
-                Text(c.name, style = MaterialTheme.typography.labelLarge, color = Z.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(c.title, style = MaterialTheme.typography.labelLarge, color = Z.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
         Row(Modifier.horizontalScroll(hScroll), horizontalArrangement = Arrangement.spacedBy(0.dp)) {

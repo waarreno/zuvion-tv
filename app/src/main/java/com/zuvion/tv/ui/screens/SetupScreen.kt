@@ -61,6 +61,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -107,6 +108,12 @@ fun GlassField(
     val focus = LocalFocusManager.current
     var focused by remember { mutableStateOf(false) }
     val coveredField = com.zuvion.tv.ui.theme.LocalCovered.current
+    // Na TV o teclado só abre com OK: assim as setas passam pelo campo sem prender no teclado.
+    val tvField = com.zuvion.tv.ui.theme.LocalIsTv.current
+    var editing by remember { mutableStateOf(false) }
+    var reopening by remember { mutableStateOf(false) }
+    val fieldFr = remember { androidx.compose.ui.focus.FocusRequester() }
+    val fieldScope = androidx.compose.runtime.rememberCoroutineScope()
     // Guarda a posição do cursor para saber quando ◀/▶ devem sair do campo.
     var tfv by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
     if (tfv.text != value) tfv = TextFieldValue(value, TextRange(value.length))
@@ -118,6 +125,7 @@ fun GlassField(
         BasicTextField(
             value = tfv, onValueChange = { tfv = it; if (it.text != value) onChange(it.text) },
             singleLine = true,
+            readOnly = tvField && !editing,
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = Z.Text),
             cursorBrush = SolidColor(Z.Violet),
             visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
@@ -132,9 +140,33 @@ fun GlassField(
             // No controle remoto, ▲/▼ saem do campo (alguns Google TV prendem o foco no texto).
             modifier = Modifier.fillMaxWidth()
                 .focusProperties { canFocus = !coveredField }
-                .onFocusChanged { focused = it.isFocused }
+                .focusRequester(fieldFr)
+                .onFocusChanged { focused = it.isFocused; if (!it.isFocused && !reopening) editing = false }
                 .onPreviewKeyEvent { ev ->
+                    val isOk = ev.key == Key.DirectionCenter || ev.key == Key.Enter || ev.key == Key.NumPadEnter
+                    if (tvField && !editing && isOk) {
+                        // OK no campo: liga a edição e abre o teclado.
+                        if (ev.type == KeyEventType.KeyUp) {
+                            // Refoca o campo já editável para o Android abrir o teclado.
+                            reopening = true
+                            editing = true
+                            fieldScope.launch {
+                                kotlinx.coroutines.delay(40)
+                                focus.clearFocus()
+                                runCatching { fieldFr.requestFocus() }
+                                reopening = false
+                            }
+                        }
+                        return@onPreviewKeyEvent true
+                    }
                     if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    if (tvField && !editing) return@onPreviewKeyEvent when (ev.key) {
+                        Key.DirectionDown -> focus.moveFocus(FocusDirection.Down)
+                        Key.DirectionUp -> focus.moveFocus(FocusDirection.Up)
+                        Key.DirectionRight -> focus.moveFocus(FocusDirection.Right)
+                        Key.DirectionLeft -> focus.moveFocus(FocusDirection.Left)
+                        else -> false
+                    }
                     when (ev.key) {
                         Key.DirectionDown -> focus.moveFocus(FocusDirection.Down)
                         Key.DirectionUp -> focus.moveFocus(FocusDirection.Up)

@@ -50,6 +50,8 @@ import com.zuvion.tv.ui.theme.Z
 import com.zuvion.tv.ui.theme.fadeEdges
 import com.zuvion.tv.ui.theme.glass
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material.icons.outlined.RadioButtonChecked
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import com.zuvion.tv.data.OPEN_EPG_BR
@@ -304,13 +306,15 @@ fun SettingsScreen(state: AppState) {
             Text("Remover “${p.name}”?", style = MaterialTheme.typography.headlineMedium, color = Z.Text)
             Text("A lista sai do app neste aparelho. Favoritos e histórico dela também deixam de aparecer.", color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val cancelFr = remember { androidx.compose.ui.focus.FocusRequester() }
+                LaunchedEffect(Unit) { kotlinx.coroutines.delay(80); runCatching { cancelFr.requestFocus() } }
                 PillButton("Remover", {
                     state.store.removePlaylist(p.id)
                     state.repo.deleteCache(p.id)
                     deleting = null
                     if (state.store.data.value.playlists.isEmpty()) state.replaceAll(Screen.Setup) else state.repo.open()
                 }, Modifier.weight(1f), primary = true)
-                PillButton("Cancelar", { deleting = null }, Modifier.weight(1f))
+                PillButton("Cancelar", { deleting = null }, Modifier.weight(1f).focusRequester(cancelFr))
             }
         }
     }
