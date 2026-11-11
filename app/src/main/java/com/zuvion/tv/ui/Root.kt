@@ -7,7 +7,6 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -183,6 +182,7 @@ private fun ScreenContent(state: AppState, s: Screen) {
 @Composable
 private fun ScreenLayer(covered: Boolean, content: @Composable () -> Unit) {
     val fr = remember { FocusRequester() }
+    val layerFocus = remember { com.zuvion.tv.ui.theme.LayerFocus() }
     val tv = LocalIsTv.current
     var wasCovered by remember { mutableStateOf(false) }
     var hasFocus by remember { mutableStateOf(false) }
@@ -191,8 +191,11 @@ private fun ScreenLayer(covered: Boolean, content: @Composable () -> Unit) {
         if (wasCovered) {
             // Voltou ao topo: devolve o foco ao último item selecionado nesta tela.
             wasCovered = false
-            delay(40)
-            runCatching { fr.requestFocus() }
+            delay(60)
+            val restored = layerFocus.last?.let { runCatching { it.requestFocus() }.isSuccess } ?: false
+            if (!restored) runCatching { fr.requestFocus() }
+            delay(80)
+            if (!hasFocus) runCatching { fr.requestFocus() }
         } else if (tv) {
             // Tela nova sem foco próprio: na TV, seleciona o primeiro item (senão as setas não respondem).
             delay(250)
@@ -210,8 +213,11 @@ private fun ScreenLayer(covered: Boolean, content: @Composable () -> Unit) {
             } else Modifier)
             .onFocusChanged { hasFocus = it.hasFocus }
     ) {
-        Box(Modifier.fillMaxSize().focusRequester(fr).focusRestorer()) {
-            androidx.compose.runtime.CompositionLocalProvider(com.zuvion.tv.ui.theme.LocalCovered provides covered) { content() }
+        Box(Modifier.fillMaxSize().focusRequester(fr).focusGroup()) {
+            androidx.compose.runtime.CompositionLocalProvider(
+                com.zuvion.tv.ui.theme.LocalCovered provides covered,
+                com.zuvion.tv.ui.theme.LocalLayerFocus provides layerFocus
+            ) { content() }
         }
     }
 }

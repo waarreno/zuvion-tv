@@ -80,6 +80,10 @@ val LocalIsTv = staticCompositionLocalOf { false }
 /** true quando a tela está coberta por outra (viva por baixo): seus itens não recebem foco. */
 val LocalCovered = androidx.compose.runtime.compositionLocalOf { false }
 
+/** Último item focado de uma tela, para devolver o foco a ele ao voltar (sem fixar itens de listas). */
+class LayerFocus { var last: androidx.compose.ui.focus.FocusRequester? = null }
+val LocalLayerFocus = staticCompositionLocalOf<LayerFocus?> { null }
+
 fun isTvDevice(ctx: Context): Boolean {
     val ui = ctx.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
     return ui?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
