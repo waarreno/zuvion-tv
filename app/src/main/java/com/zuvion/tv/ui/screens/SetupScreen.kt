@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -68,6 +69,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -103,13 +106,17 @@ fun GlassField(
 ) {
     val focus = LocalFocusManager.current
     var focused by remember { mutableStateOf(false) }
+    val coveredField = com.zuvion.tv.ui.theme.LocalCovered.current
+    // Guarda a posição do cursor para saber quando ◀/▶ devem sair do campo.
+    var tfv by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
+    if (tfv.text != value) tfv = TextFieldValue(value, TextRange(value.length))
     val shape = RoundedCornerShape(16.dp)
     // Campo de vidro próprio: rótulo acima (como no protótipo) e sem o recorte do Material,
     // que deixava uma faixa clara atrás do texto em algumas telas.
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (label.isNotEmpty()) Text(label, style = MaterialTheme.typography.labelMedium, color = if (focused) Z.Violet else Z.Muted)
         BasicTextField(
-            value = value, onValueChange = onChange,
+            value = tfv, onValueChange = { tfv = it; if (it.text != value) onChange(it.text) },
             singleLine = true,
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = Z.Text),
             cursorBrush = SolidColor(Z.Violet),
@@ -124,12 +131,16 @@ fun GlassField(
             ),
             // No controle remoto, ▲/▼ saem do campo (alguns Google TV prendem o foco no texto).
             modifier = Modifier.fillMaxWidth()
+                .focusProperties { canFocus = !coveredField }
                 .onFocusChanged { focused = it.isFocused }
                 .onPreviewKeyEvent { ev ->
                     if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                     when (ev.key) {
                         Key.DirectionDown -> focus.moveFocus(FocusDirection.Down)
                         Key.DirectionUp -> focus.moveFocus(FocusDirection.Up)
+                        // ◀ no início e ▶ no fim do texto saem do campo (ex.: botão ao lado da busca).
+                        Key.DirectionRight -> tfv.selection.collapsed && tfv.selection.end >= tfv.text.length && focus.moveFocus(FocusDirection.Right)
+                        Key.DirectionLeft -> tfv.selection.collapsed && tfv.selection.start == 0 && focus.moveFocus(FocusDirection.Left)
                         else -> false
                     }
                 },

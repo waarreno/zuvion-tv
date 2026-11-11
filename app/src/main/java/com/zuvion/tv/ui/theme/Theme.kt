@@ -77,6 +77,9 @@ object Z {
 
 val LocalIsTv = staticCompositionLocalOf { false }
 
+/** true quando a tela está coberta por outra (viva por baixo): seus itens não recebem foco. */
+val LocalCovered = androidx.compose.runtime.compositionLocalOf { false }
+
 fun isTvDevice(ctx: Context): Boolean {
     val ui = ctx.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
     return ui?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||

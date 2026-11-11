@@ -8,6 +8,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -182,13 +183,20 @@ private fun ScreenContent(state: AppState, s: Screen) {
 @Composable
 private fun ScreenLayer(covered: Boolean, content: @Composable () -> Unit) {
     val fr = remember { FocusRequester() }
+    val tv = LocalIsTv.current
     var wasCovered by remember { mutableStateOf(false) }
+    var hasFocus by remember { mutableStateOf(false) }
     LaunchedEffect(covered) {
-        if (covered) wasCovered = true
-        else if (wasCovered) {
+        if (covered) { wasCovered = true; return@LaunchedEffect }
+        if (wasCovered) {
+            // Voltou ao topo: devolve o foco ao último item selecionado nesta tela.
             wasCovered = false
-            delay(30)
+            delay(40)
             runCatching { fr.requestFocus() }
+        } else if (tv) {
+            // Tela nova sem foco próprio: na TV, seleciona o primeiro item (senão as setas não respondem).
+            delay(250)
+            if (!hasFocus) runCatching { fr.requestFocus() }
         }
     }
     Box(
@@ -200,10 +208,11 @@ private fun ScreenLayer(covered: Boolean, content: @Composable () -> Unit) {
                     while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
                 }
             } else Modifier)
-            .focusProperties { enter = { if (covered) FocusRequester.Cancel else FocusRequester.Default } }
-            .focusGroup()
+            .onFocusChanged { hasFocus = it.hasFocus }
     ) {
-        Box(Modifier.fillMaxSize().focusRequester(fr).focusRestorer()) { content() }
+        Box(Modifier.fillMaxSize().focusRequester(fr).focusRestorer()) {
+            androidx.compose.runtime.CompositionLocalProvider(com.zuvion.tv.ui.theme.LocalCovered provides covered) { content() }
+        }
     }
 }
 

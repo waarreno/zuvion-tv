@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -78,6 +79,8 @@ fun Focusable(
     content: @Composable BoxScope.(focused: Boolean) -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
+    // Itens de telas cobertas ficam fora da busca de foco (senão as setas "travam" na TV).
+    val covered = com.zuvion.tv.ui.theme.LocalCovered.current
     val scale by animateFloatAsState(if (focused) focusScale else 1f, label = "focusScale")
     val interaction = remember { MutableInteractionSource() }
     Box(
@@ -87,6 +90,7 @@ fun Focusable(
             .then(if (glass) Modifier.glass(shape, strong = selected) else Modifier.clip(shape))
             .then(if (fill != null) Modifier.background(fill) else Modifier)
             .then(if (focused) Modifier.border(3.dp, Z.Focus, shape) else Modifier)
+            .focusProperties { canFocus = !covered }
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocus?.invoke()
