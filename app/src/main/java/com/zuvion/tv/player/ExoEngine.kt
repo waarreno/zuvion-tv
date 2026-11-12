@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /** [enhance] = nível do realce de imagem ("off", "soft", "strong", "max"). */
-class ExoEngine(context: Context, private val enhance: String = "off") : VideoEngine {
+class ExoEngine(context: Context, private val enhance: String = "off", private val sourceHeight: Int = 0) : VideoEngine {
     /** Lado menor da tela física (1080 numa TV Full HD, 2160 numa TV 4K): alvo da ampliação. */
     private val display = displayMode(context)
     private var lastRendered = 0
@@ -57,7 +57,7 @@ class ExoEngine(context: Context, private val enhance: String = "off") : VideoEn
             // Antes de ligar a superfície de vídeo (feito no PlayerView).
             if (enhance != "off") {
                 Enhance.lastOutput = null
-                setVideoEffects(Enhance.effects(enhance, minOf(display.first, display.second).coerceAtMost(2160)))
+                setVideoEffects(Enhance.effects(enhance, minOf(display.first, display.second).coerceAtMost(2160), sourceHeight))
             }
             android.util.Log.i("Zuvion", "exo engine enhance=$enhance display=${display.first}x${display.second}")
             addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
@@ -91,16 +91,21 @@ class ExoEngine(context: Context, private val enhance: String = "off") : VideoEn
             })
         }
 
-    private var frLast = 0
+    private var frDecoded = 0
+    private var frShown = 0L
     private var frAt = 0L
+    /** (quadros exibidos/s, quadros decodificados/s). Com realce, "exibidos" = saídos do realce. */
     override fun frameRate(): Pair<Double, Float> {
         val c = player.videoDecoderCounters ?: return 0.0 to 0f
         c.ensureUpdated()
         val now = System.currentTimeMillis()
-        val r = c.renderedOutputBufferCount
-        val f = if (frAt > 0 && now > frAt) (r - frLast) * 1000.0 / (now - frAt) else 0.0
-        frLast = r; frAt = now
-        return f to (player.videoFormat?.frameRate ?: 0f)
+        val dec = c.renderedOutputBufferCount
+        val shownNow = if (enhance != "off") Enhance.processed.get() else dec.toLong()
+        val dt = (now - frAt).coerceAtLeast(1)
+        val shown = if (frAt > 0) (shownNow - frShown) * 1000.0 / dt else 0.0
+        val decoded = if (frAt > 0) ((dec - frDecoded) * 1000.0 / dt).toFloat() else 0f
+        frDecoded = dec; frShown = shownNow; frAt = now
+        return shown to decoded
     }
 
     override fun stats(): List<Pair<String, String>> {
@@ -110,8 +115,6 @@ class ExoEngine(context: Context, private val enhance: String = "off") : VideoEn
         counters?.ensureUpdated()
         val now = System.currentTimeMillis()
         val rendered = counters?.renderedOutputBufferCount ?: 0
-        if (lastStatsAt > 0 && now > lastStatsAt) fps = (rendered - lastRendered) * 1000.0 / (now - lastStatsAt)
-        lastRendered = rendered; lastStatsAt = now
         val out = Enhance.lastOutput
         return buildList {
             add("Motor" to "ExoPlayer (Media3)")
@@ -122,7 +125,8 @@ class ExoEngine(context: Context, private val enhance: String = "off") : VideoEn
             ).joinToString(" · "))
             add("Realce" to if (enhance == "off") "Desligado" else
                 Enhance.label(enhance) + (out?.let { " · saída ${it.width}×${it.height}" } ?: ""))
-            add("Quadros" to "%.1f/s exibidos · %d descartados".format(fps, counters?.droppedBufferCount ?: 0))
+            val (shown, decoded) = frameRate()
+            add("Quadros" to "%.1f/s exibidos · %.1f/s decodificados · %d descartados".format(shown, decoded, counters?.droppedBufferCount ?: 0))
             if (a != null) add("Áudio" to listOfNotNull(
                 codecName(a.codecs ?: a.sampleMimeType), a.sampleRate.takeIf { it > 0 }?.let { "${it / 1000.0} kHz" },
                 a.channelCount.takeIf { it > 0 }?.let { "${it}ch" }, a.bitrate.takeIf { it > 0 }?.let { "${it / 1000} kbps" }

@@ -36,13 +36,23 @@ object Enhance {
 
     /** Tamanho de saída da última ampliação (para as estatísticas). */
     @Volatile var lastOutput: Size? = null
+    /** Quadros que saíram do realce (mede a fluidez real). */
+    val processed = java.util.concurrent.atomic.AtomicLong()
 
-    /** Efeitos do nível; [targetHeight] = lado menor da tela física. */
-    fun effects(level: String, targetHeight: Int): List<Effect> {
+    /** Vale a pena limpar/ampliar com bicúbica: vídeo conhecido e menor que a tela. */
+    fun needsUpscale(sourceHeight: Int, targetHeight: Int) = sourceHeight in 1 until (targetHeight * 0.95f).toInt()
+
+    /**
+     * Efeitos do nível; [targetHeight] = lado menor da tela física, [sourceHeight] = altura do vídeo
+     * (0 = desconhecida). Limpeza e bicúbica só rodam quando o vídeo é menor que a tela: aí elas
+     * trabalham na resolução pequena (baratas) e fazem diferença; num vídeo já Full HD fica só a nitidez.
+     */
+    fun effects(level: String, targetHeight: Int, sourceHeight: Int): List<Effect> {
         val l = levels[level] ?: return emptyList()
+        val up = needsUpscale(sourceHeight, targetHeight)
         val list = ArrayList<Effect>(2)
-        if (l.denoise > 0f) list += ShaderEffect { hdr -> DenoiseProgram(hdr, l.denoise) }
-        list += ShaderEffect { hdr -> ScaleSharpenProgram(hdr, targetHeight, l.sharpen, l.bicubic) }
+        if (l.denoise > 0f && up) list += ShaderEffect { hdr -> DenoiseProgram(hdr, l.denoise) }
+        list += ShaderEffect { hdr -> ScaleSharpenProgram(hdr, targetHeight, l.sharpen, l.bicubic && up) }
         return list
     }
 
@@ -192,5 +202,8 @@ void main() {
         Enhance.lastOutput = out
         return out
     }
-    override fun uniforms() = program.setFloatUniform("uSharp", strength)
+    override fun uniforms() {
+        program.setFloatUniform("uSharp", strength)
+        Enhance.processed.incrementAndGet()
+    }
 }

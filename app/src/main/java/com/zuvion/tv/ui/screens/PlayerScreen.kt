@@ -169,8 +169,14 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
     var enhance by remember { mutableStateOf(state.store.settings.enhance) }
     var enhanceFailed by remember { mutableStateOf(false) }
     val enhanceLevel = if (enhanceFailed) "off" else enhance
-    val engine: VideoEngine = remember(engineName, enhanceLevel) {
-        if (engineName == "vlc") VlcEngine(ctx) else ExoEngine(ctx, enhanceLevel)
+    val displayH = remember { com.zuvion.tv.player.displayMode(ctx).let { minOf(it.first, it.second).coerceAtMost(2160) } }
+    // Altura do vídeo conhecida antes de tocar (ficha do servidor ou reprodução anterior).
+    var srcHeight by remember(media.key) {
+        mutableIntStateOf(media.videoHeight.takeIf { it > 0 } ?: state.store.data.value.videoHeights[media.key] ?: 0)
+    }
+    val engineSrc = if (enhanceLevel == "strong" || enhanceLevel == "max") srcHeight else 0
+    val engine: VideoEngine = remember(engineName, enhanceLevel, engineSrc) {
+        if (engineName == "vlc") VlcEngine(ctx) else ExoEngine(ctx, enhanceLevel, engineSrc)
     }
     var showStats by remember { mutableStateOf(state.store.settings.nerdStats) }
 
@@ -182,8 +188,8 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
         var slow = 0
         while (true) {
             delay(2000)
-            val (shown, src) = engine.frameRate()
-            val expected = (if (src > 1f) src else 25f).coerceAtMost(60f)
+            val (shown, decoded) = engine.frameRate()
+            val expected = (if (decoded > 1f) decoded else 25f).coerceAtMost(60f)
             val st = engine.state.value
             if (st.playing && !st.buffering && shown > 0.0) {
                 slow = if (shown < expected * 0.8) slow + 1 else 0
@@ -250,7 +256,14 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
 
     // Guarda a resolução real (para mostrar SD/HD/Full HD/4K nos detalhes).
     LaunchedEffect(es.videoHeight, media.key) {
-        if (es.videoHeight > 0 && (media.kind == Kind.MOVIE || media.kind == Kind.EPISODE)) state.store.rememberHeight(media.key, es.videoHeight)
+        val h = es.videoHeight
+        if (h > 0 && media.kind != Kind.RECORDING) state.store.rememberHeight(media.key, h)
+        // Vídeo menor que a tela descoberto agora: liga a limpeza + bicúbica (uma vez, no mesmo ponto).
+        if (h > 0 && srcHeight == 0 && (enhanceLevel == "strong" || enhanceLevel == "max") &&
+            com.zuvion.tv.player.Enhance.needsUpscale(h, displayH)) {
+            startAt = if (isLive) 0 else engine.position
+            srcHeight = h
+        } else if (h > 0 && srcHeight == 0) srcHeight = h
     }
 
     LaunchedEffect(engine) {
