@@ -105,7 +105,9 @@ class ExoEngine(context: Context, private val enhance: String = "off", private v
         val shown = if (frAt > 0) (shownNow - frShown) * 1000.0 / dt else 0.0
         val decoded = if (frAt > 0) ((dec - frDecoded) * 1000.0 / dt).toFloat() else 0f
         frDecoded = dec; frShown = shownNow; frAt = now
-        return shown to decoded
+        // Taxa nominal do vídeo (o decodificador desacelera junto quando o realce não acompanha).
+        val nominal = player.videoFormat?.frameRate?.takeIf { it > 1f } ?: 0f
+        return shown to maxOf(nominal, decoded)
     }
 
     override fun stats(): List<Pair<String, String>> {

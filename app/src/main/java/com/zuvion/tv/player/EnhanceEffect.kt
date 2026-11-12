@@ -64,7 +64,8 @@ private class ShaderEffect(private val make: (Boolean) -> GlShaderProgram) : GlE
     override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram = make(useHdr)
 }
 
-private abstract class Pass(useHdr: Boolean, fragment: String) : BaseGlShaderProgram(useHdr, 1) {
+// 3 texturas por etapa: com 1, cada etapa espera a seguinte liberar a textura e a GPU trabalha em série.
+private abstract class Pass(useHdr: Boolean, fragment: String) : BaseGlShaderProgram(useHdr, 3) {
     protected val program: GlProgram = try {
         GlProgram(VERTEX, fragment)
     } catch (e: GlUtil.GlException) {

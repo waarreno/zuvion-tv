@@ -189,7 +189,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
         while (true) {
             delay(2000)
             val (shown, decoded) = engine.frameRate()
-            val expected = (if (decoded > 1f) decoded else 25f).coerceAtMost(60f)
+            val expected = decoded.coerceIn(24f, 60f)
             val st = engine.state.value
             if (st.playing && !st.buffering && shown > 0.0) {
                 slow = if (shown < expected * 0.8) slow + 1 else 0
