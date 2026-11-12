@@ -15,12 +15,11 @@ import kotlin.math.roundToInt
 /**
  * Realce de imagem na GPU, pensado para caber até em TVs simples (ex.: Mali-G31):
  *
- * 1. **Limpeza** (só Forte/Máximo, na resolução ORIGINAL do vídeo — barata em SD/HD):
- *    filtro bilateral que alisa blocos de compressão, "mosquitos" e granulado,
- *    preservando bordas de verdade.
- * 2. **Ampliação + nitidez numa passada só**, já na resolução da tela (Full HD ou 4K):
- *    interpolação (bilinear no Suave/Forte, bicúbica Catmull-Rom no Máximo) seguida de
- *    nitidez adaptativa estilo AMD FidelityFX CAS, que reforça contornos sem criar halos.
+ * Uma única passada, já na resolução da tela (Full HD ou 4K):
+ * 1. **Ampliação**: bilinear (Suave/Forte) ou bicúbica Catmull-Rom (Máximo, quando o vídeo é menor que a tela).
+ * 2. **Limpeza** (Forte/Máximo): média bilateral com os vizinhos — alisa blocos de compressão,
+ *    "mosquitos" e granulado, preservando bordas de verdade.
+ * 3. **Nitidez adaptativa** estilo AMD FidelityFX CAS: reforça contornos sem criar halos.
  *
  * Cores em precisão média (rápidas na GPU de TV); coordenadas em precisão alta.
  */
@@ -50,10 +49,8 @@ object Enhance {
     fun effects(level: String, targetHeight: Int, sourceHeight: Int): List<Effect> {
         val l = levels[level] ?: return emptyList()
         val up = needsUpscale(sourceHeight, targetHeight)
-        val list = ArrayList<Effect>(2)
-        if (l.denoise > 0f && up) list += ShaderEffect { hdr -> DenoiseProgram(hdr, l.denoise) }
-        list += ShaderEffect { hdr -> ScaleSharpenProgram(hdr, targetHeight, l.sharpen, l.bicubic && up) }
-        return list
+        // Tudo numa passada só: em GPUs de TV, encadear etapas derruba a fluidez (medido: ~7 quadros/s).
+        return listOf(ShaderEffect { hdr -> ScaleSharpenProgram(hdr, targetHeight, l.sharpen, l.bicubic && up, l.denoise) })
     }
 
     fun label(level: String) = levels[level]?.label ?: "Desligado"
@@ -64,8 +61,7 @@ private class ShaderEffect(private val make: (Boolean) -> GlShaderProgram) : GlE
     override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram = make(useHdr)
 }
 
-// 3 texturas por etapa: com 1, cada etapa espera a seguinte liberar a textura e a GPU trabalha em série.
-private abstract class Pass(useHdr: Boolean, fragment: String) : BaseGlShaderProgram(useHdr, 3) {
+private abstract class Pass(useHdr: Boolean, fragment: String) : BaseGlShaderProgram(useHdr, 1) {
     protected val program: GlProgram = try {
         GlProgram(VERTEX, fragment)
     } catch (e: GlUtil.GlException) {
@@ -116,46 +112,21 @@ void main() {
     }
 }
 
-/** Limpeza: bilateral em cruz (5 amostras), na resolução original. */
-private class DenoiseProgram(useHdr: Boolean, private val strength: Float) : Pass(useHdr, """
-precision mediump float;
-uniform sampler2D uTexSampler;
-uniform highp vec2 uTexel;
-uniform float uRange;
-varying highp vec2 vTexSamplingCoord;
-vec3 acc(vec3 c, highp vec2 o, inout float ws) {
-  vec3 n = texture2D(uTexSampler, vTexSamplingCoord + o).rgb;
-  vec3 d = n - c;
-  float w = exp(-dot(d, d) / uRange);
-  ws += w;
-  return n * w;
-}
-void main() {
-  vec3 c = texture2D(uTexSampler, vTexSamplingCoord).rgb;
-  float ws = 1.0;
-  vec3 s = c;
-  s += acc(c, vec2(uTexel.x, 0.0), ws);
-  s += acc(c, vec2(-uTexel.x, 0.0), ws);
-  s += acc(c, vec2(0.0, uTexel.y), ws);
-  s += acc(c, vec2(0.0, -uTexel.y), ws);
-  gl_FragColor = vec4(s / ws, 1.0);
-}
-""") {
-    override fun uniforms() = program.setFloatUniform("uRange", 0.002f + 0.010f * strength)
-}
-
 /**
  * Ampliação até a tela + nitidez CAS numa passada só. A nitidez amostra os vizinhos na grade
  * do vídeo de origem (onde estão os detalhes reais), sobre a ampliação bilinear ou bicúbica.
  */
 private class ScaleSharpenProgram(
-    useHdr: Boolean, private val targetHeight: Int, private val strength: Float, bicubic: Boolean
+    useHdr: Boolean, private val targetHeight: Int, private val strength: Float, bicubic: Boolean,
+    private val denoise: Float
 ) : Pass(useHdr, """
 precision mediump float;
 uniform sampler2D uTexSampler;
 uniform highp vec2 uTexel;
 uniform float uSharp;
+uniform float uRange;
 varying highp vec2 vTexSamplingCoord;
+float bw(vec3 d) { return uRange / (uRange + dot(d, d)); }
 vec3 base(highp vec2 uv) {
 """ + (if (bicubic) """
   highp vec2 texSize = 1.0 / uTexel;
@@ -188,6 +159,12 @@ void main() {
   vec3 s = texture2D(uTexSampler, uv + vec2(0.0, uTexel.y)).rgb;
   vec3 e = texture2D(uTexSampler, uv + vec2(uTexel.x, 0.0)).rgb;
   vec3 w = texture2D(uTexSampler, uv - vec2(uTexel.x, 0.0)).rgb;
+  // Limpeza: média bilateral com os 4 vizinhos — diferenças pequenas (blocos, ruído) somem,
+  // bordas (diferenças grandes) quase não entram na média.
+  if (uRange > 0.0) {
+    float wn = bw(n - c), ws = bw(s - c), we = bw(e - c), ww = bw(w - c);
+    c = (c + n * wn + s * ws + e * we + w * ww) / (1.0 + wn + ws + we + ww);
+  }
   vec3 mn = min(c, min(min(n, s), min(e, w)));
   vec3 mx = max(c, max(max(n, s), max(e, w)));
   vec3 amp = sqrt(clamp(min(mn, 1.0 - mx) / max(mx, vec3(0.0001)), 0.0, 1.0));
@@ -205,6 +182,7 @@ void main() {
     }
     override fun uniforms() {
         program.setFloatUniform("uSharp", strength)
+        program.setFloatUniform("uRange", if (denoise > 0f) 0.0008f + 0.004f * denoise else 0f)
         Enhance.processed.incrementAndGet()
     }
 }

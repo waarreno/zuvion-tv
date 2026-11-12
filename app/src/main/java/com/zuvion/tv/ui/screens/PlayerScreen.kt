@@ -191,6 +191,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
             val (shown, decoded) = engine.frameRate()
             val expected = decoded.coerceIn(24f, 60f)
             val st = engine.state.value
+            android.util.Log.i("Zuvion", "fluidez %.1f exibidos / %.1f esperado (playing=${st.playing} buffering=${st.buffering})".format(shown, expected))
             if (st.playing && !st.buffering && shown > 0.0) {
                 slow = if (shown < expected * 0.8) slow + 1 else 0
                 if (slow >= 2) {
