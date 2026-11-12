@@ -48,8 +48,6 @@ import com.zuvion.tv.data.Variants
 import com.zuvion.tv.data.title
 import androidx.compose.material.icons.outlined.HighQuality
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.QueryStats
-import androidx.compose.ui.unit.sp
 import com.zuvion.tv.meta.SkipTimes
 import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -168,43 +166,9 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
     // Realce de imagem (só no ExoPlayer). Trocar o nível recria o motor no mesmo ponto do vídeo.
     var enhance by remember { mutableStateOf(state.store.settings.enhance) }
     var enhanceFailed by remember { mutableStateOf(false) }
-    val enhanceLevel = if (enhanceFailed) "off" else enhance
-    val displayH = remember { com.zuvion.tv.player.displayMode(ctx).let { minOf(it.first, it.second).coerceAtMost(2160) } }
-    // Altura do vídeo conhecida antes de tocar (ficha do servidor ou reprodução anterior).
-    var srcHeight by remember(media.key) {
-        mutableIntStateOf(media.videoHeight.takeIf { it > 0 } ?: state.store.data.value.videoHeights[media.key] ?: 0)
-    }
-    val engineSrc = if (enhanceLevel == "strong" || enhanceLevel == "max") srcHeight else 0
-    val engine: VideoEngine = remember(engineName, enhanceLevel, engineSrc) {
-        if (engineName == "vlc") VlcEngine(ctx) else ExoEngine(ctx, enhanceLevel, engineSrc)
-    }
-    var showStats by remember { mutableStateOf(state.store.settings.nerdStats) }
-
-    // Se o aparelho não acompanhar o realce (menos de 80% dos quadros), baixa um nível nesta reprodução.
-    LaunchedEffect(engine) {
-        if (enhanceLevel == "off") return@LaunchedEffect
-        delay(6000)
-        engine.frameRate()
-        var slow = 0
-        while (true) {
-            delay(2000)
-            val (shown, decoded) = engine.frameRate()
-            val expected = decoded.coerceIn(24f, 60f)
-            val st = engine.state.value
-            android.util.Log.d("Zuvion", "fluidez %.1f exibidos / %.1f esperado (playing=${st.playing} buffering=${st.buffering})".format(shown, expected))
-            if (st.playing && !st.buffering && shown > 0.0) {
-                slow = if (shown < expected * 0.8) slow + 1 else 0
-                if (slow >= 2) {
-                    val next = com.zuvion.tv.player.Enhance.lower(enhanceLevel)
-                    android.util.Log.i("Zuvion", "enhance $enhanceLevel lento (%.1f/%.1f fps) -> $next".format(shown, expected))
-                    startAt = if (isLive) 0 else engine.position
-                    enhance = next
-                    state.showToast(if (next == "off") "Realce desligado: o aparelho não acompanhou este vídeo"
-                        else "Realce reduzido para ${com.zuvion.tv.player.Enhance.label(next).lowercase()} para manter a fluidez")
-                    break
-                }
-            }
-        }
+    val enhanceStrength = if (enhanceFailed) 0f else when (enhance) { "soft" -> 0.35f; "strong" -> 1f; else -> 0f }
+    val engine: VideoEngine = remember(engineName, enhanceStrength) {
+        if (engineName == "vlc") VlcEngine(ctx) else ExoEngine(ctx, enhanceStrength)
     }
     val es by engine.state.collectAsState()
     var pos by remember { mutableLongStateOf(0L) }
@@ -233,7 +197,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
     // Reserva automática: se o ExoPlayer falhar, tenta o VLC.
     LaunchedEffect(es.error) {
         // Se o aparelho não aguentar o realce, tenta de novo sem ele antes de trocar de motor.
-        if (es.error != null && engineName == "exo" && enhanceLevel != "off") {
+        if (es.error != null && engineName == "exo" && enhanceStrength > 0f) {
             enhanceFailed = true
             startAt = engine.position
             state.showToast("Realce de imagem indisponível neste vídeo")
@@ -257,14 +221,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
 
     // Guarda a resolução real (para mostrar SD/HD/Full HD/4K nos detalhes).
     LaunchedEffect(es.videoHeight, media.key) {
-        val h = es.videoHeight
-        if (h > 0 && media.kind != Kind.RECORDING) state.store.rememberHeight(media.key, h)
-        // Vídeo menor que a tela descoberto agora: liga a limpeza + bicúbica (uma vez, no mesmo ponto).
-        if (h > 0 && srcHeight == 0 && (enhanceLevel == "strong" || enhanceLevel == "max") &&
-            com.zuvion.tv.player.Enhance.needsUpscale(h, displayH)) {
-            startAt = if (isLive) 0 else engine.position
-            srcHeight = h
-        } else if (h > 0 && srcHeight == 0) srcHeight = h
+        if (es.videoHeight > 0 && (media.kind == Kind.MOVIE || media.kind == Kind.EPISODE)) state.store.rememberHeight(media.key, es.videoHeight)
     }
 
     LaunchedEffect(engine) {
@@ -389,26 +346,6 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
             }
         }
 
-        // Estatísticas para nerds (canto superior esquerdo, atualiza a cada segundo).
-        if (showStats) {
-            var rows by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
-            LaunchedEffect(engine) { while (true) { rows = runCatching { engine.stats() }.getOrDefault(emptyList()); delay(1000) } }
-            Column(
-                Modifier.align(Alignment.TopStart).safeDrawingPadding().padding(start = 24.dp, top = if (overlay) 84.dp else 24.dp)
-                    .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                Text("Estatísticas para nerds", color = Z.Cyan, style = MaterialTheme.typography.labelSmall)
-                rows.forEach { (k, v) ->
-                    Row {
-                        Text(k, color = Color.White.copy(alpha = 0.6f), fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            fontSize = 12.sp, modifier = Modifier.width(78.dp))
-                        Text(v, color = Color.White, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 12.sp)
-                    }
-                }
-            }
-        }
-
         // Pular abertura / próximo episódio (aparece mesmo com os controles escondidos)
         AnimatedVisibility(
             (inIntro || inCredits) && !showChannels, enter = fadeIn(), exit = fadeOut(),
@@ -514,19 +451,13 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                             val on = enhance != "off" && !enhanceFailed && engineName != "vlc"
                             IconGlassButton(Icons.Outlined.AutoAwesome, "Realce de imagem", {
                                 if (engineName == "vlc") { state.showToast("Realce de imagem indisponível neste vídeo"); return@IconGlassButton }
-                                val next = when (enhance) { "off" -> "soft"; "soft" -> "strong"; "strong" -> "max"; else -> "off" }
+                                val next = when (enhance) { "off" -> "soft"; "soft" -> "strong"; else -> "off" }
                                 startAt = if (isLive) 0 else engine.position
                                 enhanceFailed = false
                                 enhance = next
                                 state.store.updateSettings { it.copy(enhance = next) }
-                                state.showToast("Realce de imagem: " + com.zuvion.tv.player.Enhance.label(next).lowercase())
+                                state.showToast("Realce de imagem: " + when (next) { "soft" -> "suave"; "strong" -> "forte"; else -> "desligado" })
                             }, tint = if (on) Z.Cyan else Z.Text, active = on)
-                        }
-                        item {
-                            IconGlassButton(Icons.Outlined.QueryStats, "Estatísticas para nerds", {
-                                showStats = !showStats
-                                state.store.updateSettings { it.copy(nerdStats = showStats) }
-                            }, tint = if (showStats) Z.Cyan else Z.Text, active = showStats)
                         }
                         item {
                             IconGlassButton(Icons.Outlined.AspectRatio, "Proporção: ${aspect.label}", {

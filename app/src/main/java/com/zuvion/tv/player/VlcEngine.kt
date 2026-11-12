@@ -44,29 +44,6 @@ class VlcEngine(context: Context) : VideoEngine {
         }
     }
 
-    private var lastShown = 0
-    private var lastStatsAt = 0L
-    private var fps = 0.0
-
-    override fun stats(): List<Pair<String, String>> {
-        val t = mp.currentVideoTrack
-        val st = mp.media?.stats
-        val now = System.currentTimeMillis()
-        val shown = st?.displayedPictures ?: 0
-        if (lastStatsAt > 0 && now > lastStatsAt) fps = (shown - lastShown) * 1000.0 / (now - lastStatsAt)
-        lastShown = shown; lastStatsAt = now
-        return buildList {
-            add("Motor" to "VLC (libVLC)")
-            if (t != null) add("Vídeo" to listOfNotNull("${t.width}×${t.height}", codecName(t.codec),
-                (t.frameRateNum.toDouble() / t.frameRateDen.coerceAtLeast(1)).takeIf { it > 0 }?.let { "%.2f fps".format(it) }).joinToString(" · "))
-            add("Realce" to "Indisponível no VLC")
-            if (st != null) {
-                add("Quadros" to "%.1f/s exibidos · %d perdidos".format(fps, st.lostPictures))
-                add("Entrada" to mbps((st.inputBitrate * 8_000_000).toLong()))
-            }
-        }
-    }
-
     override val position: Long get() = mp.time.coerceAtLeast(0)
     override val duration: Long get() = mp.length.coerceAtLeast(0)
 

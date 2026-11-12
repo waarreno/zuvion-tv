@@ -226,16 +226,11 @@ fun SettingsScreen(state: AppState) {
 
         item {
             Section("Realce de imagem") {
-                Text("Melhora a imagem na placa de vídeo do aparelho: amplia até a resolução da sua tela (Full HD ou 4K), " +
-                    "limpa blocos e ruído de compressão e reforça a nitidez das bordas sem criar halos.",
+                Text("Melhora vídeos em baixa qualidade: amplia para Full HD e aumenta a nitidez das bordas, sem estourar o contraste. " +
+                    "Usa a placa de vídeo do aparelho; em aparelhos mais simples, prefira o modo suave. Também dá para trocar no player.",
                     color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
-                Text("Suave: nitidez leve.  Forte: limpeza moderada + mais nitidez.  " +
-                    "Máximo: limpeza e nitidez máximas + ampliação bicúbica, para vídeos SD e muito comprimidos. " +
-                    "Se o aparelho não mantiver a fluidez, o app baixa o nível sozinho naquele vídeo. " +
-                    "Para acompanhar, ligue as estatísticas para nerds.",
-                    color = Z.Faint, style = MaterialTheme.typography.labelMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("off" to "Desligado", "soft" to "Suave", "strong" to "Forte", "max" to "Máximo").forEach { (v, l) ->
+                    listOf("off" to "Desligado", "soft" to "Suave", "strong" to "Forte").forEach { (v, l) ->
                         Chip(l, s.enhance == v, { state.store.updateSettings { it.copy(enhance = v) } })
                     }
                 }
@@ -250,7 +245,6 @@ fun SettingsScreen(state: AppState) {
                     Chip("VLC (compatível)", s.engine == "vlc", { state.store.updateSettings { it.copy(engine = "vlc") } })
                 }
                 ToggleRow("Se o ExoPlayer falhar, tentar no VLC automaticamente", s.autoFallbackVlc) { v -> state.store.updateSettings { it.copy(autoFallbackVlc = v) } }
-                ToggleRow("Mostrar estatísticas para nerds no player", s.nerdStats) { v -> state.store.updateSettings { it.copy(nerdStats = v) } }
                 Text("Formato dos canais ao vivo (Xtream)", color = Z.Muted, style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Chip("MPEG-TS", s.liveFormat == "ts", { if (s.liveFormat != "ts") { state.store.updateSettings { it.copy(liveFormat = "ts") }; state.repo.refresh() } })

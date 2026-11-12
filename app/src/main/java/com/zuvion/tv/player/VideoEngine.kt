@@ -34,10 +34,6 @@ interface VideoEngine {
     fun selectAudio(id: String)
     fun selectSubtitle(id: String?)
     fun setAspect(mode: AspectMode)
-    /** Estatísticas para nerds (rótulo, valor), atualizadas a cada chamada. */
-    fun stats(): List<Pair<String, String>> = emptyList()
-    /** (quadros exibidos por segundo, quadros/s do vídeo) medidos desde a última chamada; 0 = desconhecido. */
-    fun frameRate(): Pair<Double, Float> = 0.0 to 0f
     fun release()
 
     @Composable

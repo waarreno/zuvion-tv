@@ -44,8 +44,7 @@ Player IPTV gratuito para <b>celular</b> e <b>Android TV / Google TV</b>, com vi
 - **Perfis** com nome, avatar e cor, perfil infantil e **PIN** para conteúdo adulto.
 - **Multi-tela:** até 4 canais ao mesmo tempo.
 - **Gravação** do programa ao vivo.
-- **Realce de imagem:** amplia até a resolução da sua tela (Full HD ou 4K), limpa blocos e ruído de compressão e reforça a nitidez, na placa de vídeo do aparelho. Níveis Suave, Forte e Máximo, com ajuste automático se o aparelho não acompanhar.
-- **Estatísticas para nerds:** resolução, codec, taxa de quadros (exibidos, decodificados, descartados), áudio, buffer e velocidade da conexão, por cima do vídeo.
+- **Realce de imagem:** amplia vídeos abaixo de Full HD e reforça a nitidez na placa de vídeo do aparelho (suave ou forte), ligado quando você quiser.
 - **Barra de progresso navegável:** no controle, ◀ ▶ sobre a barra avançam ou voltam, e o passo acelera ao segurar. No celular, basta tocar ou arrastar.
 - **Tema claro ou escuro.**
 - **Digitar pelo celular:** na TV, um QR Code abre uma página no celular para digitar o login ou a busca, sem usar o controle.
