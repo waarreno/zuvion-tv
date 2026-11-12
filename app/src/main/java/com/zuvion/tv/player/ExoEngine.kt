@@ -66,6 +66,14 @@ class ExoEngine(context: Context, enhance: Float = 0f) : VideoEngine {
                     android.util.Log.i("Zuvion", "video source=${h}p output=${videoSize.width}x${videoSize.height}")
                 }
                 override fun onTracksChanged(tracks: Tracks) = sync()
+                // Com o realce ligado o Android não avisa o tamanho do vídeo: lê do formato no 1º quadro.
+                override fun onRenderedFirstFrame() {
+                    val h = this@apply.videoFormat?.height ?: 0
+                    if (h > 0 && _state.value.videoHeight != h) {
+                        _state.value = _state.value.copy(videoSize = quality(h), videoHeight = h)
+                        android.util.Log.i("Zuvion", "video source=${h}p (primeiro quadro)")
+                    }
+                }
             })
         }
 
