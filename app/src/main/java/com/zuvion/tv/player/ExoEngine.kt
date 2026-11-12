@@ -91,20 +91,28 @@ class ExoEngine(context: Context, private val enhance: String = "off", private v
             })
         }
 
-    private var frDecoded = 0
-    private var frShown = 0L
-    private var frAt = 0L
-    /** (quadros exibidos/s, quadros decodificados/s). Com realce, "exibidos" = saídos do realce. */
+    /** Medidor de quadros com estado próprio (a redução automática e as estatísticas não se atrapalham). */
+    private inner class FrameMeter {
+        private var dec0 = 0; private var shown0 = 0L; private var at = 0L
+        fun sample(): Pair<Double, Float> {
+            val c = player.videoDecoderCounters ?: return 0.0 to 0f
+            c.ensureUpdated()
+            val now = System.currentTimeMillis()
+            val dec = c.renderedOutputBufferCount
+            val shownNow = if (enhance != "off") Enhance.processed.get() else dec.toLong()
+            val dt = (now - at).coerceAtLeast(1)
+            val shown = if (at > 0) (shownNow - shown0) * 1000.0 / dt else 0.0
+            val decoded = if (at > 0) ((dec - dec0) * 1000.0 / dt).toFloat() else 0f
+            dec0 = dec; shown0 = shownNow; at = now
+            return shown to decoded
+        }
+    }
+    private val autoMeter = FrameMeter()
+    private val statsMeter = FrameMeter()
+
+    /** (quadros exibidos/s, quadros/s esperados). Com realce, "exibidos" = saídos do realce. */
     override fun frameRate(): Pair<Double, Float> {
-        val c = player.videoDecoderCounters ?: return 0.0 to 0f
-        c.ensureUpdated()
-        val now = System.currentTimeMillis()
-        val dec = c.renderedOutputBufferCount
-        val shownNow = if (enhance != "off") Enhance.processed.get() else dec.toLong()
-        val dt = (now - frAt).coerceAtLeast(1)
-        val shown = if (frAt > 0) (shownNow - frShown) * 1000.0 / dt else 0.0
-        val decoded = if (frAt > 0) ((dec - frDecoded) * 1000.0 / dt).toFloat() else 0f
-        frDecoded = dec; frShown = shownNow; frAt = now
+        val (shown, decoded) = autoMeter.sample()
         // Taxa nominal do vídeo (o decodificador desacelera junto quando o realce não acompanha).
         val nominal = player.videoFormat?.frameRate?.takeIf { it > 1f } ?: 0f
         return shown to maxOf(nominal, decoded)
@@ -127,7 +135,7 @@ class ExoEngine(context: Context, private val enhance: String = "off", private v
             ).joinToString(" · "))
             add("Realce" to if (enhance == "off") "Desligado" else
                 Enhance.label(enhance) + (out?.let { " · saída ${it.width}×${it.height}" } ?: ""))
-            val (shown, decoded) = frameRate()
+            val (shown, decoded) = statsMeter.sample()
             add("Quadros" to "%.1f/s exibidos · %.1f/s decodificados · %d descartados".format(shown, decoded, counters?.droppedBufferCount ?: 0))
             if (a != null) add("Áudio" to listOfNotNull(
                 codecName(a.codecs ?: a.sampleMimeType), a.sampleRate.takeIf { it > 0 }?.let { "${it / 1000.0} kHz" },
