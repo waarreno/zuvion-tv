@@ -36,7 +36,7 @@ class VlcEngine(context: Context) : VideoEngine {
                 MediaPlayer.Event.EndReached -> _state.value = _state.value.copy(ended = true, playing = false)
                 MediaPlayer.Event.Vout -> {
                     val h = mp.currentVideoTrack?.height ?: 0
-                    if (h > 0) _state.value = _state.value.copy(videoSize = when {
+                    if (h > 0) _state.value = _state.value.copy(videoHeight = h, videoSize = when {
                         h >= 2000 -> "4K"; h >= 1000 -> "FHD"; h >= 700 -> "HD"; else -> "SD"
                     })
                 }

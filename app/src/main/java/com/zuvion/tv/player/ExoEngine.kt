@@ -50,15 +50,20 @@ class ExoEngine(context: Context, enhance: Float = 0f) : VideoEngine {
         .build().apply {
             // Antes de ligar a superfície de vídeo (feito no PlayerView).
             if (enhance > 0f) setVideoEffects(listOf(EnhanceEffect(enhance)))
+            android.util.Log.i("Zuvion", "exo engine enhance=$enhance")
             playWhenReady = true
             addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(s: Int) = sync()
                 override fun onIsPlayingChanged(isPlaying: Boolean) = sync()
                 override fun onPlayerError(error: PlaybackException) {
+                    android.util.Log.w("Zuvion", "player error ${error.errorCodeName}", error)
                     _state.value = _state.value.copy(error = error.errorCodeName + ": " + (error.message ?: ""), buffering = false)
                 }
                 override fun onVideoSizeChanged(videoSize: VideoSize) {
-                    if (videoSize.height > 0) _state.value = _state.value.copy(videoSize = quality(videoSize.height))
+                    // Com o realce ligado, o tamanho de saída é o ampliado: usa a altura do vídeo de origem.
+                    val h = this@apply.videoFormat?.height?.takeIf { it > 0 } ?: videoSize.height
+                    if (h > 0) _state.value = _state.value.copy(videoSize = quality(h), videoHeight = h)
+                    android.util.Log.i("Zuvion", "video source=${h}p output=${videoSize.width}x${videoSize.height}")
                 }
                 override fun onTracksChanged(tracks: Tracks) = sync()
             })

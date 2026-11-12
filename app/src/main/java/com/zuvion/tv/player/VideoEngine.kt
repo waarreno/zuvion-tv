@@ -9,7 +9,9 @@ data class EngineState(
     val buffering: Boolean = true,
     val error: String? = null,
     val ended: Boolean = false,
-    val videoSize: String? = null
+    val videoSize: String? = null,
+    /** Altura real do vídeo de origem (antes do realce de imagem). */
+    val videoHeight: Int = 0
 )
 
 data class Track(val id: String, val label: String, val selected: Boolean)

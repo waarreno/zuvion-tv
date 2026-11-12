@@ -89,6 +89,11 @@ class Store(context: Context, private val scope: CoroutineScope) {
         pd.copy(history = (listOf(e) + pd.history.filterNot { it.item.key == c.key }).take(60))
     }
 
+    fun rememberHeight(key: String, h: Int) {
+        if (h <= 0 || _data.value.videoHeights[key] == h) return
+        update { d -> d.copy(videoHeights = (d.videoHeights + (key to h)).let { m -> if (m.size > 3000) m.entries.drop(500).associate { it.toPair() } else m }) }
+    }
+
     /** Tira do "Continuar assistindo" e zera o progresso. */
     fun removeProgress(c: Content) = updateProfileData { pd -> pd.copy(history = pd.history.filterNot { it.item.key == c.key }) }
 

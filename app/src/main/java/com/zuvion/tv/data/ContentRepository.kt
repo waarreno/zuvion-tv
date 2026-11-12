@@ -261,7 +261,7 @@ class ContentRepository(
      */
     fun qualityOf(c: Content): String =
         Variants.quality(c.name).ifEmpty { categoryOf(c)?.name?.let { Variants.quality(it) }.orEmpty() }
-            .ifEmpty { Variants.qualityFromHeight(c.videoHeight) }
+            .ifEmpty { Variants.qualityFromHeight(c.videoHeight.takeIf { it > 0 } ?: store.data.value.videoHeights[c.key] ?: 0) }
 
     fun categoryOf(c: Content): Category? = _library.value.categories[c.kind]?.firstOrNull { it.id == c.categoryId }
 }

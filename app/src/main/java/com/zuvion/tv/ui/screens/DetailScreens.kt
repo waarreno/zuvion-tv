@@ -129,12 +129,20 @@ fun MovieDetailScreen(state: AppState, base: Content) {
                 Text(if (genres.isEmpty()) "FILME" else "FILME · " + genres.take(3).joinToString(" · ").uppercase(), style = MaterialTheme.typography.labelSmall, color = Z.Cyan)
                 Text(m?.title?.ifBlank { null } ?: item.title, style = if (tv) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium, color = Z.Text)
                 // Qualidade (Full HD, 4K…) em vez do tipo de arquivo; com vários formatos, mostra todos.
-                val qualities = remember(base.key, item.videoHeight) {
-                    state.repo.variantsOf(base).map { v -> state.repo.qualityOf(if (v.key == item.key) item else v) }
-                        .filter { it.isNotEmpty() }.distinct()
+                // Qualidade da versão que vai tocar; as outras versões aparecem como "também em…".
+                val qualityText = remember(base.key, item.videoHeight, playable.key) {
+                    val main = state.repo.qualityOf(if (playable.key == item.key) item else playable)
+                    val others = state.repo.variantsOf(base).filter { it.key != playable.key }
+                        .map { state.repo.qualityOf(it) }.filter { it.isNotEmpty() && it != main }.distinct()
                         .sortedBy { listOf("4K", "Full HD", "HD", "SD").indexOf(it) }
+                    when {
+                        main.isNotEmpty() && others.isNotEmpty() -> "$main · também em " + others.joinToString(", ")
+                        main.isNotEmpty() -> main
+                        others.isNotEmpty() -> "Também em " + others.joinToString(", ")
+                        else -> null
+                    }
                 }
-                val line = metaLine(item, m, qualities.joinToString(" / ").ifEmpty { null })
+                val line = metaLine(item, m, qualityText)
                 if (line.isNotBlank()) Text(line, color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
                 val plot = m?.overview?.ifBlank { null } ?: item.plot
                 plot?.let { Text(it, color = Z.Muted, style = MaterialTheme.typography.bodyLarge, maxLines = if (tv) 6 else 12, overflow = TextOverflow.Ellipsis) }

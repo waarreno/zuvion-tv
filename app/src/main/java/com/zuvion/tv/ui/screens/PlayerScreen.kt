@@ -219,6 +219,11 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
         }
     }
 
+    // Guarda a resolução real (para mostrar SD/HD/Full HD/4K nos detalhes).
+    LaunchedEffect(es.videoHeight, media.key) {
+        if (es.videoHeight > 0 && (media.kind == Kind.MOVIE || media.kind == Kind.EPISODE)) state.store.rememberHeight(media.key, es.videoHeight)
+    }
+
     LaunchedEffect(engine) {
         var tick = 0
         while (true) {
@@ -402,7 +407,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                             }
                         }
                     } else if (dur > 0) {
-                        SeekBar(pos, dur, onSeek = { engine.seekTo(it); pos = it }, onActivity = { bump++ })
+                        SeekBar(pos, dur, onSeek = { android.util.Log.i("Zuvion", "seekbar -> $it"); engine.seekTo(it); pos = it }, onActivity = { bump++ })
                     }
                     // Controles
                     LazyRow(

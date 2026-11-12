@@ -139,6 +139,8 @@ data class AppData(
     val playlists: List<Playlist> = emptyList(),
     val profiles: List<Profile> = emptyList(),
     val profileData: Map<String, ProfileData> = emptyMap(),
+    /** Resolução medida ao tocar (chave do conteúdo -> altura), para mostrar a qualidade real. */
+    val videoHeights: Map<String, Int> = emptyMap(),
     val settings: Settings = Settings()
 )
 
