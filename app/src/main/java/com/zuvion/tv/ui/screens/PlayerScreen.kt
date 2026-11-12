@@ -184,7 +184,8 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
             delay(2000)
             val (shown, src) = engine.frameRate()
             val expected = (if (src > 1f) src else 25f).coerceAtMost(60f)
-            if (es.playing && !es.buffering && shown > 0.0) {
+            val st = engine.state.value
+            if (st.playing && !st.buffering && shown > 0.0) {
                 slow = if (shown < expected * 0.8) slow + 1 else 0
                 if (slow >= 2) {
                     val next = com.zuvion.tv.player.Enhance.lower(enhanceLevel)
