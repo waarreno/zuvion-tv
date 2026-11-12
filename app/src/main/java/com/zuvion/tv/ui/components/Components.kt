@@ -114,8 +114,8 @@ fun Focusable(
 
 /** Brilho suave em volta do item focado (sem sombra de elevação, que deixava "quadrados" brancos em algumas TVs). */
 private fun Modifier.focusGlow(shape: Shape): Modifier = drawBehind {
-    for (i in 1..4) {
-        val grow = i * 3.dp.toPx()
+    for (i in 1..3) {
+        val grow = i * 2.5.dp.toPx()
         val outline = shape.createOutline(androidx.compose.ui.geometry.Size(size.width + grow * 2, size.height + grow * 2), layoutDirection, this)
         translate(-grow, -grow) {
             drawOutline(outline, Z.VioletDeep.copy(alpha = 0.16f / i))

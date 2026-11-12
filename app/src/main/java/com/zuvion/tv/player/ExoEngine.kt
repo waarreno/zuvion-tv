@@ -25,7 +25,8 @@ import com.zuvion.tv.source.Http
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-class ExoEngine(context: Context) : VideoEngine {
+/** [enhance] 0 = desligado; 0..1 = realce de imagem (upscaling + nitidez). */
+class ExoEngine(context: Context, enhance: Float = 0f) : VideoEngine {
     override val name = "ExoPlayer"
     private val _state = MutableStateFlow(EngineState())
     override val state: StateFlow<EngineState> = _state
@@ -47,6 +48,8 @@ class ExoEngine(context: Context) : VideoEngine {
             DefaultLoadControl.Builder().setBufferDurationsMs(15_000, 50_000, 1_500, 3_000).build()
         )
         .build().apply {
+            // Antes de ligar a superfície de vídeo (feito no PlayerView).
+            if (enhance > 0f) setVideoEffects(listOf(EnhanceEffect(enhance)))
             playWhenReady = true
             addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(s: Int) = sync()

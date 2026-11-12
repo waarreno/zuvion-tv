@@ -99,7 +99,9 @@ fun HomeScreen(state: AppState) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { series.sortedByDescending { it.added }.take(30) }
     }
     val history = pd.history.filter { it.item.playlistId == pid }
-    val cont = history.filter { it.item.kind != Kind.LIVE }
+    // Entra a partir do mínimo configurado (padrão 5%); quem passou do máximo já saiu ao salvar.
+    val minPct = data.settings.continueMinPct / 100f
+    val cont = history.filter { it.item.kind != Kind.LIVE && it.durationMs > 0 && it.fraction >= minPct }
     val favChannels = pd.favorites.filter { it.playlistId == pid && it.kind == Kind.LIVE }
     val recentChannels = history.filter { it.item.kind == Kind.LIVE }.map { it.item }
     val favVod = pd.favorites.filter { it.playlistId == pid && it.kind != Kind.LIVE }
@@ -125,7 +127,7 @@ fun HomeScreen(state: AppState) {
         hero?.let { h -> item { Hero(state, h) } }
         if (cont.isNotEmpty()) item {
             ShelfRow(cont, "Continuar assistindo") { e ->
-                WideCard(e.item.title, e.item.poster, { state.play(e.item) }, progress = e.fraction,
+                WideCard(e.item.title, rememberLandscape(state, e.item), { state.play(e.item) }, progress = e.fraction,
                     subtitle = if (e.item.kind == Kind.EPISODE) "T${e.item.season} · E${e.item.episode}" else null,
                     onLongClick = { removing = e.item })
             }
@@ -158,6 +160,28 @@ fun HomeScreen(state: AppState) {
             Box(Modifier.height(240.dp)) { EmptyView("Abra “Ao vivo” para começar a assistir.") }
         }
     }
+}
+
+/**
+ * Imagem horizontal para "Continuar assistindo": fundo (backdrop) do TMDB para filmes,
+ * imagem do episódio ou fundo da série para episódios; o cartaz do servidor como reserva.
+ */
+@Composable
+private fun rememberLandscape(state: AppState, item: Content): String? {
+    val img by produceState<String?>(null, item.key) {
+        value = when (item.kind) {
+            Kind.MOVIE -> state.meta.forContent(item)?.backdrop
+            Kind.EPISODE -> {
+                val series = state.repo.library.value.items[Kind.SERIES].orEmpty()
+                    .firstOrNull { it.id == item.seriesId && it.playlistId == item.playlistId }
+                // Imagem do episódio (TMDB) quando já foi aberta; senão o fundo da série.
+                item.poster?.takeIf { it.contains("image.tmdb.org") }
+                    ?: series?.let { state.meta.forContent(it)?.backdrop }
+            }
+            else -> null
+        }?.replace("/w1280/", "/w780/")
+    }
+    return img ?: item.poster
 }
 
 @Composable
@@ -224,8 +248,9 @@ private fun Hero(state: AppState, item: Content) {
         Modifier
             .padding(horizontal = if (tv) 28.dp else 20.dp)
             .fillMaxWidth()
-            // Altura mínima; cresce se o título for longo (nada cortado em celulares estreitos).
-            .heightIn(min = if (tv) 300.dp else 230.dp)
+            // TV: altura fixa — ao andar pelos cartazes o destaque muda, e a tela não pode "pular".
+            // Celular: altura mínima que cresce com títulos longos (nada cortado).
+            .then(if (tv) Modifier.height(300.dp) else Modifier.heightIn(min = 230.dp))
             .clip(RoundedCornerShape(30.dp))
             .background(Z.Tint.copy(alpha = 0.04f), RoundedCornerShape(30.dp))
     ) {
@@ -236,7 +261,7 @@ private fun Hero(state: AppState, item: Content) {
                 modifier = Modifier.matchParentSize().blur(28.dp).alpha(0.55f))
         }
         Box(Modifier.matchParentSize().background(Brush.horizontalGradient(listOf(Z.Space.copy(alpha = 0.92f), Color.Transparent))))
-        androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().heightIn(min = if (tv) 300.dp else 230.dp).padding(if (tv) 24.dp else 20.dp), verticalAlignment = Alignment.Bottom) {
+        androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().then(if (tv) Modifier.fillMaxSize() else Modifier.heightIn(min = 230.dp)).padding(if (tv) 24.dp else 20.dp), verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(if (item.kind == Kind.SERIES) "EM DESTAQUE · SÉRIE" else "EM DESTAQUE · FILME", style = MaterialTheme.typography.labelSmall, color = Z.Cyan)
                 Text(m?.title?.ifBlank { null } ?: item.title, style = if (tv) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium, color = Z.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)

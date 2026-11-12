@@ -48,7 +48,7 @@ fun VodScreen(state: AppState, kind: Kind) {
                 else -> LazyVerticalGrid(
                     columns = GridCells.Adaptive(if (tv) 150.dp else 110.dp),
                     modifier = Modifier.fadeEdges(),
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 22.dp, bottom = 28.dp),
+                    contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 22.dp, bottom = 28.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {

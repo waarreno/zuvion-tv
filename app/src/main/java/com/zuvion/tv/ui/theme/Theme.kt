@@ -25,6 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -192,7 +194,18 @@ fun Modifier.glass(shape: Shape = RoundedCornerShape(24.dp), strong: Boolean = f
 
 
 /** Esmaece suavemente o conteúdo que rola para baixo de cabeçalhos (topo) e da barra (base). */
-fun Modifier.fadeEdges(top: androidx.compose.ui.unit.Dp = 22.dp, bottom: androidx.compose.ui.unit.Dp = 22.dp): Modifier = this
+fun Modifier.fadeEdges(top: androidx.compose.ui.unit.Dp = 22.dp, bottom: androidx.compose.ui.unit.Dp = 22.dp, bleed: androidx.compose.ui.unit.Dp = 20.dp): Modifier = this
+    // A camada é desenhada fora da tela; sem margem ela recortaria o brilho e o zoom do item
+    // focado nas laterais. Por isso ela é [bleed] mais larga de cada lado (o conteúdo não muda de lugar).
+    .layout { measurable, constraints ->
+        val b = bleed.roundToPx()
+        val c = if (constraints.hasBoundedWidth) constraints.copy(
+            minWidth = constraints.minWidth + 2 * b, maxWidth = constraints.maxWidth + 2 * b
+        ) else constraints
+        val p = measurable.measure(c)
+        val w = if (constraints.hasBoundedWidth) p.width - 2 * b else p.width
+        layout(w.coerceAtLeast(0), p.height) { p.place(if (constraints.hasBoundedWidth) -b else 0, 0) }
+    }
     .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
     .drawWithContent {
         drawContent()
@@ -205,3 +218,4 @@ fun Modifier.fadeEdges(top: androidx.compose.ui.unit.Dp = 22.dp, bottom: android
             blendMode = androidx.compose.ui.graphics.BlendMode.DstIn
         )
     }
+    .padding(horizontal = bleed)

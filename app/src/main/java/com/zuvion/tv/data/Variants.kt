@@ -25,6 +25,11 @@ object Variants {
 
     fun isH265(name: String) = codecRx.containsMatchIn(name)
 
+    /** Qualidade pela altura real do vídeo. */
+    fun qualityFromHeight(h: Int): String = when {
+        h >= 1800 -> "4K"; h >= 1000 -> "Full HD"; h >= 700 -> "HD"; h > 0 -> "SD"; else -> ""
+    }
+
     /** Rótulo do formato para o seletor: "Full HD", "4K · H.265", "HD · Legendado"… */
     fun label(name: String): String = listOfNotNull(
         quality(name).ifEmpty { "Padrão" },

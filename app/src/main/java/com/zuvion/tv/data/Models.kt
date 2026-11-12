@@ -56,6 +56,8 @@ data class Content(
     val season: Int = 0,
     val episode: Int = 0,
     val added: Long = 0,
+    /** Altura real do vídeo (quando o servidor informa), para mostrar SD/HD/Full HD/4K. */
+    val videoHeight: Int = 0,
     /** Id no TMDB (preenchido pelos metadados; usado no TheIntroDB). */
     val tmdbId: Int = 0
 ) {
@@ -119,8 +121,15 @@ data class Settings(
     /** Guia complementar (XMLTV) somado ao do provedor. */
     val extraEpgUrl: String = "",
     /** O usuário já criou/confirmou o primeiro perfil. */
-    val profileSetupDone: Boolean = false
+    val profileSetupDone: Boolean = false,
+    /** Realce de imagem: off | soft | strong. */
+    val enhance: String = "off",
+    /** Continuar assistindo: entra a partir de X% e sai (concluído) a partir de Y%. */
+    val continueMinPct: Int = 5,
+    val continueMaxPct: Int = 90
 )
+
+fun Settings.enhanceStrength(): Float = when (enhance) { "soft" -> 0.35f; "strong" -> 1f; else -> 0f }
 
 /** Guia aberto do Brasil (XMLTV gratuito, ~260 canais). */
 const val OPEN_EPG_BR = "https://epgshare01.online/epgshare01/epg_ripper_BR1.xml.gz"

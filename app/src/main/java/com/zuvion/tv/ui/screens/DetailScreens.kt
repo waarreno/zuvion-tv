@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Replay
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -93,7 +94,7 @@ fun MovieDetailScreen(state: AppState, base: Content) {
     // TMDB primeiro; os dados do servidor só são buscados se o TMDB não encontrar.
     val detail by produceState(base to state.meta.cached(base), base.key) {
         val m = state.meta.forContent(base, full = true)
-        val server = if (m == null || m.overview.isBlank()) runCatching { state.repo.source?.movieInfo(base) }.getOrNull() ?: base else base
+        val server = runCatching { state.repo.source?.movieInfo(base) }.getOrNull() ?: base
         value = server to m
     }
     val (item, m) = detail
@@ -128,8 +129,9 @@ fun MovieDetailScreen(state: AppState, base: Content) {
                 Text(if (genres.isEmpty()) "FILME" else "FILME · " + genres.take(3).joinToString(" · ").uppercase(), style = MaterialTheme.typography.labelSmall, color = Z.Cyan)
                 Text(m?.title?.ifBlank { null } ?: item.title, style = if (tv) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium, color = Z.Text)
                 // Qualidade (Full HD, 4K…) em vez do tipo de arquivo; com vários formatos, mostra todos.
-                val qualities = remember(base.key) {
-                    state.repo.variantsOf(base).map { Variants.quality(it.name) }.filter { it.isNotEmpty() }.distinct()
+                val qualities = remember(base.key, item.videoHeight) {
+                    state.repo.variantsOf(base).map { v -> state.repo.qualityOf(if (v.key == item.key) item else v) }
+                        .filter { it.isNotEmpty() }.distinct()
                         .sortedBy { listOf("4K", "Full HD", "HD", "SD").indexOf(it) }
                 }
                 val line = metaLine(item, m, qualities.joinToString(" / ").ifEmpty { null })
@@ -139,9 +141,12 @@ fun MovieDetailScreen(state: AppState, base: Content) {
                 val people = listOfNotNull(m?.director?.let { "Direção: $it" }, m?.cast?.takeIf { it.isNotEmpty() }?.let { "Elenco: " + it.take(5).joinToString() })
                 people.forEach { Text(it, color = Z.Faint, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    val resume = progress?.takeIf { it.fraction in 0.01f..0.95f }
+                    val resume = progress?.takeIf { it.fraction in 0.01f..(data.settings.continueMaxPct / 100f) }
                     PillButton(if (resume != null) "Continuar" else "Assistir", { state.play(playable) }, Modifier.focusRequester(fr), icon = Icons.Outlined.PlayArrow, primary = true)
                     if (resume != null) PillButton("Do início", { state.play(playable, startMs = 0) }, icon = Icons.Outlined.Replay)
+                    if (resume != null) PillButton("Remover de Continuar", {
+                        state.store.removeProgress(resume.item); state.showToast("Removido de Continuar assistindo")
+                    }, icon = Icons.Outlined.Close)
                     PillButton(if (fav) "Na sua lista" else "Minha lista", { state.store.toggleFavorite(base) },
                         icon = if (fav) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder)
                 }
@@ -215,6 +220,9 @@ private fun SeriesBody(
                             if (last != null) "Continuar T${target.season}·E${target.episode}" else "Assistir T${target.season}·E${target.episode}",
                             { state.play(target, allEpisodes) }, Modifier.focusRequester(fr), icon = Icons.Outlined.PlayArrow, primary = true
                         )
+                        if (last != null) PillButton("Remover de Continuar", {
+                            state.store.removeProgress(last.item); state.showToast("Removido de Continuar assistindo")
+                        }, icon = Icons.Outlined.Close)
                         PillButton(if (fav) "Na sua lista" else "Minha lista", { state.store.toggleFavorite(series) },
                             icon = if (fav) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder)
                     }

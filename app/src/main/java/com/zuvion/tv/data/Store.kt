@@ -78,7 +78,7 @@ class Store(context: Context, private val scope: CoroutineScope) {
         if (c.kind == Kind.LIVE) return
         updateProfileData { pd ->
             val rest = pd.history.filterNot { it.item.key == c.key }
-            val done = dur > 0 && pos > dur * 0.95
+            val done = dur > 0 && pos > dur * (settings.continueMaxPct / 100.0)
             val list = if (done) rest else listOf(HistoryEntry(c, pos, dur, System.currentTimeMillis())) + rest
             pd.copy(history = list.take(60))
         }

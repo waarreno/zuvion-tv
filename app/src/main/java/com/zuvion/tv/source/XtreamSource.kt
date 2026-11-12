@@ -93,7 +93,8 @@ class XtreamSource(override val playlist: Playlist, private val liveFormat: Stri
             plot = info.str("plot") ?: info.str("description") ?: movie.plot,
             year = info.str("releasedate")?.take(4) ?: info.str("release_date")?.take(4) ?: movie.year,
             poster = movie.poster ?: info.str("movie_image"),
-            rating = info.str("rating") ?: movie.rating
+            rating = info.str("rating") ?: movie.rating,
+            videoHeight = info["video"].obj()?.int("height")?.takeIf { it > 0 } ?: movie.videoHeight
         )
     }
 

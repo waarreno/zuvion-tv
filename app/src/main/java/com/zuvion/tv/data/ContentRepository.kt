@@ -255,5 +255,13 @@ class ContentRepository(
         }
     }
 
+    /**
+     * Qualidade de um item: marca no nome ("4K", "FHD"…), senão a da categoria ("Filmes | 4K"),
+     * senão a altura real do vídeo informada pelo servidor. Vazio quando não dá para saber.
+     */
+    fun qualityOf(c: Content): String =
+        Variants.quality(c.name).ifEmpty { categoryOf(c)?.name?.let { Variants.quality(it) }.orEmpty() }
+            .ifEmpty { Variants.qualityFromHeight(c.videoHeight) }
+
     fun categoryOf(c: Content): Category? = _library.value.categories[c.kind]?.firstOrNull { it.id == c.categoryId }
 }

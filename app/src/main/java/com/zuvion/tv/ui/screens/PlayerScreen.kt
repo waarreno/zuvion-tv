@@ -6,6 +6,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +47,7 @@ import com.zuvion.tv.data.EpgProgram
 import com.zuvion.tv.data.Variants
 import com.zuvion.tv.data.title
 import androidx.compose.material.icons.outlined.HighQuality
+import androidx.compose.material.icons.outlined.AutoAwesome
 import com.zuvion.tv.meta.SkipTimes
 import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -157,7 +163,13 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
     var aspect by remember { mutableStateOf(AspectMode.FIT) }
     val isLive = media.kind == Kind.LIVE && overrideUrl == null
 
-    val engine: VideoEngine = remember(engineName) { if (engineName == "vlc") VlcEngine(ctx) else ExoEngine(ctx) }
+    // Realce de imagem (só no ExoPlayer). Trocar o nível recria o motor no mesmo ponto do vídeo.
+    var enhance by remember { mutableStateOf(state.store.settings.enhance) }
+    var enhanceFailed by remember { mutableStateOf(false) }
+    val enhanceStrength = if (enhanceFailed) 0f else when (enhance) { "soft" -> 0.35f; "strong" -> 1f; else -> 0f }
+    val engine: VideoEngine = remember(engineName, enhanceStrength) {
+        if (engineName == "vlc") VlcEngine(ctx) else ExoEngine(ctx, enhanceStrength)
+    }
     val es by engine.state.collectAsState()
     var pos by remember { mutableLongStateOf(0L) }
     var dur by remember { mutableLongStateOf(0L) }
@@ -184,6 +196,13 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
 
     // Reserva automática: se o ExoPlayer falhar, tenta o VLC.
     LaunchedEffect(es.error) {
+        // Se o aparelho não aguentar o realce, tenta de novo sem ele antes de trocar de motor.
+        if (es.error != null && engineName == "exo" && enhanceStrength > 0f) {
+            enhanceFailed = true
+            startAt = engine.position
+            state.showToast("Realce de imagem indisponível neste vídeo")
+            return@LaunchedEffect
+        }
         if (es.error != null && engineName == "exo" && state.store.settings.autoFallbackVlc && !triedFallback) {
             triedFallback = true
             startAt = engine.position
@@ -383,16 +402,12 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                             }
                         }
                     } else if (dur > 0) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(fmtTime(pos), color = Z.Muted, style = MaterialTheme.typography.labelMedium)
-                            ProgressLine(pos.toFloat() / dur, Modifier.weight(1f), height = 6.dp)
-                            Text(fmtTime(dur), color = Z.Muted, style = MaterialTheme.typography.labelMedium)
-                        }
+                        SeekBar(pos, dur, onSeek = { engine.seekTo(it); pos = it }, onActivity = { bump++ })
                     }
                     // Controles
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-                        contentPadding = PaddingValues(6.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         val np = nowProg
@@ -427,6 +442,18 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                         }
                         if (variants.size > 1) item { IconGlassButton(Icons.Outlined.HighQuality, "Formato: ${Variants.label(media.name)}", { showFormats = true }) }
                         item { IconGlassButton(Icons.Outlined.Subtitles, "Áudio e legendas", { showTracks = true }) }
+                        item {
+                            val on = enhance != "off" && !enhanceFailed && engineName != "vlc"
+                            IconGlassButton(Icons.Outlined.AutoAwesome, "Realce de imagem", {
+                                if (engineName == "vlc") { state.showToast("Realce de imagem indisponível neste vídeo"); return@IconGlassButton }
+                                val next = when (enhance) { "off" -> "soft"; "soft" -> "strong"; else -> "off" }
+                                startAt = if (isLive) 0 else engine.position
+                                enhanceFailed = false
+                                enhance = next
+                                state.store.updateSettings { it.copy(enhance = next) }
+                                state.showToast("Realce de imagem: " + when (next) { "soft" -> "suave"; "strong" -> "forte"; else -> "desligado" })
+                            }, tint = if (on) Z.Cyan else Z.Text, active = on)
+                        }
                         item {
                             IconGlassButton(Icons.Outlined.AspectRatio, "Proporção: ${aspect.label}", {
                                 aspect = AspectMode.entries[(aspect.ordinal + 1) % AspectMode.entries.size]
@@ -488,7 +515,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
             Text("Formato", style = MaterialTheme.typography.headlineMedium, color = Z.Text)
             Text("A escolha vale para os próximos canais e filmes também.", color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
             val fr = remember { FocusRequester() }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
                 items(variants) { v ->
                     val sel = v.key == media.key
                     com.zuvion.tv.ui.components.Chip(Variants.label(v.name), sel, {
@@ -570,7 +597,81 @@ private fun TracksDialog(engine: VideoEngine, onDismiss: () -> Unit) {
 
 @Composable
 private fun TrackList(tracks: List<Track>, onPick: (Track) -> Unit) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
         items(tracks) { t -> com.zuvion.tv.ui.components.Chip(t.label, t.selected, { onPick(t) }) }
+    }
+}
+
+/**
+ * Barra de progresso navegável.
+ * TV: com foco, ◀ ▶ movem a posição (o passo acelera ao segurar: 10 s → 30 s → 1 min → 2 min)
+ * e o vídeo pula para lá quando você para de apertar (ou na hora, com OK).
+ * Celular: toque ou arraste sobre a barra.
+ */
+@Composable
+private fun SeekBar(pos: Long, dur: Long, onSeek: (Long) -> Unit, onActivity: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    var target by remember { mutableStateOf<Long?>(null) }
+    var dragging by remember { mutableStateOf(false) }
+    var widthPx by remember { mutableIntStateOf(1) }
+    val shown = target ?: pos
+    // Pula para a posição escolhida quando as teclas param.
+    LaunchedEffect(target, dragging) {
+        val t = target ?: return@LaunchedEffect
+        if (dragging) return@LaunchedEffect
+        delay(650)
+        onSeek(t); target = null
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(fmtTime(shown), color = if (target != null) Z.Text else Z.Muted, style = MaterialTheme.typography.labelMedium)
+        Box(
+            Modifier
+                .weight(1f)
+                .height(28.dp)
+                .onSizeChanged { widthPx = it.width.coerceAtLeast(1) }
+                .onFocusChanged { focused = it.isFocused }
+                .onKeyEvent { ev ->
+                    if (ev.type != KeyEventType.KeyDown) return@onKeyEvent false
+                    val repeat = ev.nativeKeyEvent.repeatCount
+                    val step = when { repeat < 4 -> 10_000L; repeat < 12 -> 30_000L; repeat < 24 -> 60_000L; else -> 120_000L }
+                    when (ev.key.nativeKeyCode) {
+                        AKeyEvent.KEYCODE_DPAD_RIGHT -> { target = (shown + step).coerceAtMost(dur - 1000); onActivity(); true }
+                        AKeyEvent.KEYCODE_DPAD_LEFT -> { target = (shown - step).coerceAtLeast(0); onActivity(); true }
+                        AKeyEvent.KEYCODE_DPAD_CENTER, AKeyEvent.KEYCODE_ENTER -> { target?.let { onSeek(it); target = null }; onActivity(); true }
+                        else -> false
+                    }
+                }
+                .focusable()
+                .pointerInput(dur) {
+                    detectTapGestures { o -> onSeek((o.x / widthPx * dur).toLong().coerceIn(0, dur - 1000)); onActivity() }
+                }
+                .pointerInput(dur) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { o -> dragging = true; target = (o.x / widthPx * dur).toLong() },
+                        onDragEnd = { dragging = false },
+                        onDragCancel = { dragging = false; target = null }
+                    ) { change, _ ->
+                        target = (change.position.x / widthPx * dur).toLong().coerceIn(0, dur - 1000); onActivity()
+                    }
+                },
+            contentAlignment = Alignment.CenterStart
+        ) {
+            val f = if (dur > 0) (shown.toFloat() / dur).coerceIn(0f, 1f) else 0f
+            val h = if (focused || dragging) 8.dp else 6.dp
+            ProgressLine(f, Modifier.fillMaxWidth(), height = h)
+            if (focused || dragging || target != null) {
+                // Marcador da posição
+                Box(Modifier.fillMaxWidth(f).height(1.dp))
+                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val x = maxWidth * f - 9.dp
+                    Box(
+                        Modifier.padding(start = x.coerceAtLeast(0.dp)).size(18.dp)
+                            .background(Color.White, CircleShape)
+                            .then(if (focused) Modifier.border(3.dp, Z.Violet, CircleShape) else Modifier)
+                    )
+                }
+            }
+        }
+        Text(fmtTime(dur), color = Z.Muted, style = MaterialTheme.typography.labelMedium)
     }
 }

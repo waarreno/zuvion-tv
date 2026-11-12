@@ -114,7 +114,8 @@ class AppState(val app: ZuvionApp) {
     }
 
     fun play(item: Content, list: List<Content> = listOf(item), startMs: Long? = null, overrideUrl: String? = null, subtitle: String? = null) {
-        val resume = startMs ?: store.progressOf(item)?.takeIf { it.fraction in 0.01f..0.95f }?.positionMs ?: 0
+        val s = store.settings
+        val resume = startMs ?: store.progressOf(item)?.takeIf { it.fraction in 0.01f..(s.continueMaxPct / 100f) }?.positionMs ?: 0
         push(Screen.Player(item, list, resume, overrideUrl, subtitle))
     }
 

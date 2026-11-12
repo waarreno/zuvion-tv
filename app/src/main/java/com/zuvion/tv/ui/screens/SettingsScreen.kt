@@ -169,6 +169,21 @@ fun SettingsScreen(state: AppState) {
         }
 
         item {
+            Section("Continuar assistindo") {
+                Text("Aparece em Continuar assistindo a partir de", color = Z.Muted, style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(1, 5, 10).forEach { v -> Chip("$v%", s.continueMinPct == v, { state.store.updateSettings { it.copy(continueMinPct = v) } }) }
+                }
+                Text("Considera assistido (e retira) a partir de", color = Z.Muted, style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(85, 90, 95).forEach { v -> Chip("$v%", s.continueMaxPct == v, { state.store.updateSettings { it.copy(continueMaxPct = v) } }) }
+                }
+                Text("Para tirar um título, segure OK sobre ele na tela inicial, ou use “Remover de Continuar” nos detalhes.",
+                    color = Z.Faint, style = MaterialTheme.typography.labelMedium)
+            }
+        }
+
+        item {
             Section("Aparência") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     listOf("system" to "Automático", "dark" to "Escuro", "light" to "Claro").forEach { (v, l) ->
@@ -206,6 +221,19 @@ fun SettingsScreen(state: AppState) {
             Section("Perfis") {
                 Text("Perfil atual: ${state.store.activeProfile?.name ?: "-"}", color = Z.Muted)
                 PillButton("Gerenciar perfis", { state.push(Screen.Profiles) }, icon = Icons.Outlined.People)
+            }
+        }
+
+        item {
+            Section("Realce de imagem") {
+                Text("Melhora vídeos em baixa qualidade: amplia para Full HD e aumenta a nitidez das bordas, sem estourar o contraste. " +
+                    "Usa a placa de vídeo do aparelho; em aparelhos mais simples, prefira o modo suave. Também dá para trocar no player.",
+                    color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("off" to "Desligado", "soft" to "Suave", "strong" to "Forte").forEach { (v, l) ->
+                        Chip(l, s.enhance == v, { state.store.updateSettings { it.copy(enhance = v) } })
+                    }
+                }
             }
         }
 
