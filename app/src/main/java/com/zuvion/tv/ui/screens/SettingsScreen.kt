@@ -226,12 +226,13 @@ fun SettingsScreen(state: AppState) {
 
         item {
             Section("Realce de imagem") {
-                Text("Melhora a imagem na placa de vídeo do aparelho, em até três etapas: limpa blocos e ruído de compressão, " +
-                    "amplia até a resolução da sua tela (Full HD ou 4K) e reforça a nitidez das bordas sem criar halos.",
+                Text("Melhora a imagem na placa de vídeo do aparelho: amplia até a resolução da sua tela (Full HD ou 4K), " +
+                    "limpa blocos e ruído de compressão e reforça a nitidez das bordas sem criar halos.",
                     color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
-                Text("Suave: ampliação + nitidez leve.  Forte: + limpeza de compressão moderada e mais nitidez.  " +
-                    "Máximo: limpeza intensa e nitidez máxima, melhor para vídeos SD e muito comprimidos. " +
-                    "Para conferir se o aparelho aguenta, ligue as estatísticas para nerds no player (quadros descartados).",
+                Text("Suave: nitidez leve.  Forte: limpeza moderada + mais nitidez.  " +
+                    "Máximo: limpeza e nitidez máximas + ampliação bicúbica, para vídeos SD e muito comprimidos. " +
+                    "Se o aparelho não mantiver a fluidez, o app baixa o nível sozinho naquele vídeo. " +
+                    "Para acompanhar, ligue as estatísticas para nerds.",
                     color = Z.Faint, style = MaterialTheme.typography.labelMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("off" to "Desligado", "soft" to "Suave", "strong" to "Forte", "max" to "Máximo").forEach { (v, l) ->
