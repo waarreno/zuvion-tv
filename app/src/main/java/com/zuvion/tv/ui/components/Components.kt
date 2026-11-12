@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -84,6 +85,8 @@ fun Focusable(
     val covered = com.zuvion.tv.ui.theme.LocalCovered.current
     val layerFocus = com.zuvion.tv.ui.theme.LocalLayerFocus.current
     val requester = remember { androidx.compose.ui.focus.FocusRequester() }
+    val keyDownAt = remember { longArrayOf(0L) }
+    val longFired = remember { booleanArrayOf(false) }
     androidx.compose.runtime.DisposableEffect(layerFocus) { onDispose { if (layerFocus?.last === requester) layerFocus.last = null } }
     val scale by animateFloatAsState(if (focused) focusScale else 1f, label = "focusScale")
     val interaction = remember { MutableInteractionSource() }
@@ -97,6 +100,29 @@ fun Focusable(
             // Lido na hora em que o Android pergunta (sem esperar recomposição das listas).
             .focusProperties { canFocus = !covered && layerFocus?.covered != true }
             .focusRequester(requester)
+            // Controle remoto: segurar OK = toque longo (o Compose só entende o toque longo na tela).
+            .then(if (onLongClick != null) Modifier.onPreviewKeyEvent { ev ->
+                val code = ev.nativeKeyEvent.keyCode
+                if (code != android.view.KeyEvent.KEYCODE_DPAD_CENTER && code != android.view.KeyEvent.KEYCODE_ENTER &&
+                    code != android.view.KeyEvent.KEYCODE_NUMPAD_ENTER) return@onPreviewKeyEvent false
+                when (ev.nativeKeyEvent.action) {
+                    android.view.KeyEvent.ACTION_DOWN -> {
+                        if (ev.nativeKeyEvent.repeatCount == 0) { keyDownAt[0] = System.currentTimeMillis(); longFired[0] = false }
+                        else if (!longFired[0] && (ev.nativeKeyEvent.isLongPress || ev.nativeKeyEvent.repeatCount >= 2)) {
+                            longFired[0] = true; onLongClick()
+                        }
+                        true
+                    }
+                    android.view.KeyEvent.ACTION_UP -> {
+                        if (!longFired[0]) {
+                            if (keyDownAt[0] > 0 && System.currentTimeMillis() - keyDownAt[0] >= 550) onLongClick() else onClick()
+                        }
+                        keyDownAt[0] = 0L; longFired[0] = false
+                        true
+                    }
+                    else -> false
+                }
+            } else Modifier)
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused && layerFocus?.covered != true && layerFocus?.restoring != true) layerFocus?.last = requester
