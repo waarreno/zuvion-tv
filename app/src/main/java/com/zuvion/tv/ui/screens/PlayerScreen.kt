@@ -173,6 +173,31 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
         if (engineName == "vlc") VlcEngine(ctx) else ExoEngine(ctx, enhanceLevel)
     }
     var showStats by remember { mutableStateOf(state.store.settings.nerdStats) }
+
+    // Se o aparelho não acompanhar o realce (menos de 80% dos quadros), baixa um nível nesta reprodução.
+    LaunchedEffect(engine) {
+        if (enhanceLevel == "off") return@LaunchedEffect
+        delay(6000)
+        engine.frameRate()
+        var slow = 0
+        while (true) {
+            delay(2000)
+            val (shown, src) = engine.frameRate()
+            val expected = (if (src > 1f) src else 25f).coerceAtMost(60f)
+            if (es.playing && !es.buffering && shown > 0.0) {
+                slow = if (shown < expected * 0.8) slow + 1 else 0
+                if (slow >= 2) {
+                    val next = com.zuvion.tv.player.Enhance.lower(enhanceLevel)
+                    android.util.Log.i("Zuvion", "enhance $enhanceLevel lento (%.1f/%.1f fps) -> $next".format(shown, expected))
+                    startAt = if (isLive) 0 else engine.position
+                    enhance = next
+                    state.showToast(if (next == "off") "Realce desligado: o aparelho não acompanhou este vídeo"
+                        else "Realce reduzido para ${com.zuvion.tv.player.Enhance.label(next).lowercase()} para manter a fluidez")
+                    break
+                }
+            }
+        }
+    }
     val es by engine.state.collectAsState()
     var pos by remember { mutableLongStateOf(0L) }
     var dur by remember { mutableLongStateOf(0L) }

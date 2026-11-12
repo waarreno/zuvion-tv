@@ -91,6 +91,18 @@ class ExoEngine(context: Context, private val enhance: String = "off") : VideoEn
             })
         }
 
+    private var frLast = 0
+    private var frAt = 0L
+    override fun frameRate(): Pair<Double, Float> {
+        val c = player.videoDecoderCounters ?: return 0.0 to 0f
+        c.ensureUpdated()
+        val now = System.currentTimeMillis()
+        val r = c.renderedOutputBufferCount
+        val f = if (frAt > 0 && now > frAt) (r - frLast) * 1000.0 / (now - frAt) else 0.0
+        frLast = r; frAt = now
+        return f to (player.videoFormat?.frameRate ?: 0f)
+    }
+
     override fun stats(): List<Pair<String, String>> {
         val v = player.videoFormat
         val a = player.audioFormat
