@@ -122,14 +122,16 @@ data class Settings(
     val extraEpgUrl: String = "",
     /** O usuário já criou/confirmou o primeiro perfil. */
     val profileSetupDone: Boolean = false,
-    /** Realce de imagem: off | soft | strong. */
+    /** Realce de imagem: off | soft | strong | max. */
     val enhance: String = "off",
+    /** Mostra o painel "estatísticas para nerds" no player. */
+    val nerdStats: Boolean = false,
     /** Continuar assistindo: entra a partir de X% e sai (concluído) a partir de Y%. */
     val continueMinPct: Int = 5,
     val continueMaxPct: Int = 90
 )
 
-fun Settings.enhanceStrength(): Float = when (enhance) { "soft" -> 0.35f; "strong" -> 1f; else -> 0f }
+
 
 /** Guia aberto do Brasil (XMLTV gratuito, ~260 canais). */
 const val OPEN_EPG_BR = "https://epgshare01.online/epgshare01/epg_ripper_BR1.xml.gz"

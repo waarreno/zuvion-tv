@@ -25,8 +25,14 @@ import com.zuvion.tv.source.Http
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/** [enhance] 0 = desligado; 0..1 = realce de imagem (upscaling + nitidez). */
-class ExoEngine(context: Context, enhance: Float = 0f) : VideoEngine {
+/** [enhance] = nível do realce de imagem ("off", "soft", "strong", "max"). */
+class ExoEngine(context: Context, private val enhance: String = "off") : VideoEngine {
+    /** Lado menor da tela física (1080 numa TV Full HD, 2160 numa TV 4K): alvo da ampliação. */
+    private val display = displayMode(context)
+    private var lastRendered = 0
+    private var lastStatsAt = 0L
+    private var fps = 0.0
+    @Volatile private var bandwidth = 0L
     override val name = "ExoPlayer"
     private val _state = MutableStateFlow(EngineState())
     override val state: StateFlow<EngineState> = _state
@@ -49,8 +55,16 @@ class ExoEngine(context: Context, enhance: Float = 0f) : VideoEngine {
         )
         .build().apply {
             // Antes de ligar a superfície de vídeo (feito no PlayerView).
-            if (enhance > 0f) setVideoEffects(listOf(EnhanceEffect(enhance)))
-            android.util.Log.i("Zuvion", "exo engine enhance=$enhance")
+            if (enhance != "off") {
+                Enhance.lastOutput = null
+                setVideoEffects(Enhance.effects(enhance, minOf(display.first, display.second).coerceAtMost(2160)))
+            }
+            android.util.Log.i("Zuvion", "exo engine enhance=$enhance display=${display.first}x${display.second}")
+            addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+                override fun onBandwidthEstimate(eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime, totalLoadTimeMs: Int, totalBytesLoaded: Long, bitrateEstimate: Long) {
+                    bandwidth = bitrateEstimate
+                }
+            })
             playWhenReady = true
             addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(s: Int) = sync()
@@ -76,6 +90,36 @@ class ExoEngine(context: Context, enhance: Float = 0f) : VideoEngine {
                 }
             })
         }
+
+    override fun stats(): List<Pair<String, String>> {
+        val v = player.videoFormat
+        val a = player.audioFormat
+        val counters = player.videoDecoderCounters
+        counters?.ensureUpdated()
+        val now = System.currentTimeMillis()
+        val rendered = counters?.renderedOutputBufferCount ?: 0
+        if (lastStatsAt > 0 && now > lastStatsAt) fps = (rendered - lastRendered) * 1000.0 / (now - lastStatsAt)
+        lastRendered = rendered; lastStatsAt = now
+        val out = Enhance.lastOutput
+        return buildList {
+            add("Motor" to "ExoPlayer (Media3)")
+            if (v != null) add("Vídeo" to listOfNotNull(
+                "${v.width}×${v.height}", codecName(v.codecs ?: v.sampleMimeType),
+                v.frameRate.takeIf { it > 0 }?.let { "%.2f fps".format(it) },
+                v.bitrate.takeIf { it > 0 }?.let { mbps(it.toLong()) }
+            ).joinToString(" · "))
+            add("Realce" to if (enhance == "off") "Desligado" else
+                Enhance.label(enhance) + (out?.let { " · saída ${it.width}×${it.height}" } ?: ""))
+            add("Quadros" to "%.1f/s exibidos · %d descartados".format(fps, counters?.droppedBufferCount ?: 0))
+            if (a != null) add("Áudio" to listOfNotNull(
+                codecName(a.codecs ?: a.sampleMimeType), a.sampleRate.takeIf { it > 0 }?.let { "${it / 1000.0} kHz" },
+                a.channelCount.takeIf { it > 0 }?.let { "${it}ch" }, a.bitrate.takeIf { it > 0 }?.let { "${it / 1000} kbps" }
+            ).joinToString(" · "))
+            add("Buffer" to "%.1f s".format(player.totalBufferedDuration / 1000.0))
+            if (bandwidth > 0) add("Conexão" to mbps(bandwidth) + " (estimativa)")
+            add("Tela" to "${display.first}×${display.second}")
+        }
+    }
 
     private fun quality(h: Int) = when {
         h >= 2000 -> "4K"; h >= 1000 -> "FHD"; h >= 700 -> "HD"; else -> "SD"
@@ -175,3 +219,29 @@ class ExoEngine(context: Context, enhance: Float = 0f) : VideoEngine {
         )
     }
 }
+
+
+internal fun mbps(bps: Long) = if (bps >= 1_000_000) "%.1f Mbps".format(bps / 1e6) else "${bps / 1000} kbps"
+
+internal fun codecName(c: String?): String? {
+    val x = c?.lowercase() ?: return null
+    return when {
+        x.startsWith("avc") || x.contains("h264") -> "H.264 ($c)"
+        x.startsWith("hev") || x.startsWith("hvc") || x.contains("hevc") -> "H.265 ($c)"
+        x.startsWith("av01") || x.contains("av1") -> "AV1"
+        x.startsWith("vp9") || x.startsWith("vp09") -> "VP9"
+        x.startsWith("mp4a") || x.contains("aac") -> "AAC"
+        x.contains("ac-3") || x.contains("ac3") -> "Dolby Digital"
+        x.contains("ec-3") || x.contains("eac3") -> "Dolby Digital Plus"
+        x.contains("mpeg") || x.contains("mp2") -> "MPEG"
+        else -> c
+    }
+}
+
+/** Resolução física do modo de tela atual (largura, altura). */
+internal fun displayMode(context: Context): Pair<Int, Int> = runCatching {
+    val wm = context.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
+    @Suppress("DEPRECATION") val d = wm.defaultDisplay
+    if (android.os.Build.VERSION.SDK_INT >= 23) d.mode.physicalWidth to d.mode.physicalHeight
+    else android.graphics.Point().also { @Suppress("DEPRECATION") d.getRealSize(it) }.let { it.x to it.y }
+}.getOrDefault(1920 to 1080)

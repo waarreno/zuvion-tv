@@ -293,7 +293,7 @@ fun MainShell(state: AppState) {
 @Composable
 private fun NavRail(state: AppState) {
     // Se o foco está no menu e a aba muda (ex.: voltar para Início), o foco acompanha o item da aba.
-    val tabs = Tab.entries.filter { it != Tab.SETTINGS }
+    val tabs = Tab.entries.toList()
     val reqs = remember { tabs.associateWith { FocusRequester() } }
     var railHasFocus by remember { mutableStateOf(false) }
     LaunchedEffect(state.tab) {
@@ -312,8 +312,9 @@ private fun NavRail(state: AppState) {
     ) {
         Logo(44.dp)
         Spacer(Modifier.height(14.dp))
-        // Configurações ficam na engrenagem do topo da tela inicial (sem item extra no menu).
         tabs.forEach { t ->
+            // Configurações ficam no pé do menu, separadas das abas de conteúdo.
+            if (t == Tab.SETTINGS) Spacer(Modifier.weight(1f))
             val selected = state.tab == t
             Focusable(
                 onClick = { state.tab = t },
