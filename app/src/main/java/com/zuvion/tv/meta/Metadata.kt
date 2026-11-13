@@ -105,6 +105,30 @@ class Metadata(private val context: Context, private val store: Store) {
         }
     }
 
+    val tmdbReady: Boolean get() = tmdbKey.isNotEmpty()
+
+    /** Chave do título (nome limpo + ano), igual para os vários formatos do mesmo filme. */
+    fun titleKey(c: Content): String = cacheKey(c)
+
+    /** Ids de gênero do TMDB pela busca (1 chamada). null = erro de rede; vazio = não encontrado. */
+    suspend fun tmdbGenres(c: Content): List<Int>? {
+        if (tmdbKey.isEmpty() || (c.kind != Kind.MOVIE && c.kind != Kind.SERIES)) return null
+        val (title, y) = cleanTitle(c.name)
+        val year = y ?: c.year?.take(4)?.takeIf { it.length == 4 }
+        val tv = c.kind == Kind.SERIES
+        val type = if (tv) "tv" else "movie"
+        return try {
+            var r = tmdbGet("/search/$type", "query=" + enc(title) + (year?.let { if (tv) "&first_air_date_year=$it" else "&year=$it" } ?: ""))?.get("results").arr().orEmpty()
+            if (r.isEmpty() && year != null) r = tmdbGet("/search/$type", "query=" + enc(title))?.get("results").arr().orEmpty()
+            r.firstOrNull()?.obj()?.get("genre_ids").arr().orEmpty().mapNotNull { it.toString().trim('"').toIntOrNull() }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Throwable) { null }
+    }
+
+    /** Id do IMDb (tt…) do título, para buscar em outras fontes. */
+    suspend fun imdbId(c: Content): String? = forContent(c, full = true)?.imdbId
+
     private fun cacheKey(c: Content) = "${c.kind}|${cleanTitle(c.name).first.lowercase()}|${cleanTitle(c.name).second ?: c.year.orEmpty()}"
 
     /** null = erro de rede (não grava cache); Meta() vazio = não encontrado. */

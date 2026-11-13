@@ -56,7 +56,8 @@ class ContentRepository(
     private val context: Context,
     private val store: Store,
     private val epg: EpgRepository,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val genres: GenreIndex
 ) {
     private val _library = MutableStateFlow(Library())
     val library: StateFlow<Library> = _library
@@ -81,6 +82,7 @@ class ContentRepository(
             if (cached == null) { refreshNow(); return@launch }
             _library.value = cached
             groups()
+            enrichGenres()
             val hours = store.settings.refreshHours
             val age = System.currentTimeMillis() - cached.updatedAt
             if (hours > 0 && age > hours * 3600_000L) refreshNow()
@@ -142,6 +144,7 @@ class ContentRepository(
                 val now = System.currentTimeMillis()
                 _library.update { it.copy(categories = catMap, items = itemMap, loading = false, error = null, updatedAt = now) }
                 groups()
+                enrichGenres()
                 withContext(Dispatchers.IO) { writeCache(p.id, catMap, itemMap, now) }
                 store.updateSettings { it.copy(libraryUpdated = it.libraryUpdated + (p.id to now)) }
                 step("EPG", StepState.LOADING)
@@ -229,6 +232,50 @@ class ContentRepository(
 
     fun categories(kind: Kind): List<Category> = _library.value.categories[kind].orEmpty().filter { allowed(it) }
 
+    // ---- Gêneros do app (no lugar das categorias do provedor) ----
+
+    /** Consulta no TMDB, em segundo plano, os gêneros dos títulos ainda sem gênero. */
+    fun enrichGenres() {
+        if (!store.settings.genreMode) return
+        val lib = _library.value
+        genres.enrich(lib.items[Kind.MOVIE].orEmpty() + lib.items[Kind.SERIES].orEmpty())
+    }
+
+    /** Só dá para agrupar quando a lista inteira está carregada (portais MAC carregam por categoria). */
+    private fun usesGenres(kind: Kind) = store.settings.genreMode && _library.value.items[kind].orEmpty().isNotEmpty()
+
+    private class GenreView(val lib: Library, val version: Int, val byGenre: Map<String, List<Content>>)
+    private val genreViews = HashMap<Kind, GenreView>()
+
+    private fun genreView(kind: Kind): Map<String, List<Content>> {
+        val lib = _library.value
+        val ver = genres.version
+        synchronized(genreViews) { genreViews[kind]?.let { if (it.lib === lib && it.version == ver) return it.byGenre } }
+        val cats = lib.categories[kind].orEmpty().associateBy { it.id }
+        val out = HashMap<String, MutableList<Content>>()
+        fun add(g: String, c: Content) { out.getOrPut(g) { ArrayList() }.add(c) }
+        for (c in lib.items[kind].orEmpty()) {
+            val cat = cats[c.categoryId]
+            if (kind == Kind.LIVE) { add(Genres.liveGroup(c, cat), c); continue }
+            if (cat?.adult == true || isAdultName(c.name)) { add(Genres.ADULT, c); continue }
+            val g = genres.idsOf(c)?.let { Genres.fromTmdb(kind, it) }?.takeIf { it.isNotEmpty() } ?: Genres.fromCategory(kind, cat)
+            if (g.isEmpty()) add(Genres.OTHERS, c) else g.forEach { add(it, c) }
+            if (Genres.isRelease(c, cat)) add(Genres.RELEASES, c)
+        }
+        out[Genres.RELEASES]?.sortByDescending { it.added }
+        synchronized(genreViews) { genreViews[kind] = GenreView(lib, ver, out) }
+        return out
+    }
+
+    /** Categorias mostradas nas telas: gêneros do app ou, se desligado, as do provedor. */
+    suspend fun categoryList(kind: Kind): List<Category> = withContext(Dispatchers.Default) {
+        if (!usesGenres(kind)) return@withContext categories(kind)
+        val view = genreView(kind)
+        val names = if (kind == Kind.LIVE) Genres.liveOrder.filter { view[it].orEmpty().isNotEmpty() }
+            else Genres.vodOrder(view.keys.filter { view[it].orEmpty().isNotEmpty() })
+        names.map { Category(Genres.PREFIX + it, it, kind) }.filter { allowed(it) }
+    }
+
     suspend fun itemsIn(kind: Kind, categoryId: String?): List<Content> = withContext(Dispatchers.Default) { itemsInImpl(kind, categoryId) }
 
     private suspend fun itemsInImpl(kind: Kind, categoryId: String?): List<Content> {
@@ -236,6 +283,10 @@ class ContentRepository(
         val all = lib.items[kind].orEmpty()
         val catById = lib.categories[kind].orEmpty().associateBy { it.id }
         if (categoryId == null) return Variants.dedupe(all.filter { allowed(catById[it.categoryId]) }, preferred)
+        if (categoryId.startsWith(Genres.PREFIX)) {
+            if (all.isEmpty()) return emptyList()
+            return Variants.dedupe(genreView(kind)[categoryId.removePrefix(Genres.PREFIX)].orEmpty(), preferred)
+        }
         if (all.isNotEmpty()) return Variants.dedupe(all.filter { it.categoryId == categoryId }, preferred)
         val src = source ?: return emptyList()
         return lock.withLock {

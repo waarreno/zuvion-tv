@@ -34,6 +34,8 @@ interface VideoEngine {
     fun selectAudio(id: String)
     fun selectSubtitle(id: String?)
     fun setAspect(mode: AspectMode)
+    /** Estatísticas para nerds (rótulo, valor), atualizadas a cada chamada. */
+    fun stats(): List<Pair<String, String>> = emptyList()
     fun release()
 
     @Composable

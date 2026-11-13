@@ -48,6 +48,8 @@ import com.zuvion.tv.data.Variants
 import com.zuvion.tv.data.title
 import androidx.compose.material.icons.outlined.HighQuality
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.QueryStats
+import androidx.compose.ui.unit.sp
 import com.zuvion.tv.meta.SkipTimes
 import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -157,6 +159,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
     var engineName by remember { mutableStateOf(state.store.settings.engine) }
     var triedFallback by remember { mutableStateOf(false) }
     var overrideUrl by remember(s) { mutableStateOf(s.overrideUrl) }
+    var external by remember(s) { mutableStateOf(s.external) }
     var subtitle by remember(s) { mutableStateOf(s.subtitle) }
     var startAt by remember(s) { mutableLongStateOf(s.startMs) }
     var currentUrl by remember { mutableStateOf<String?>(null) }
@@ -171,11 +174,12 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
         if (engineName == "vlc") VlcEngine(ctx) else ExoEngine(ctx, enhanceStrength)
     }
     val es by engine.state.collectAsState()
+    var showStats by remember { mutableStateOf(state.store.settings.nerdStats) }
     var pos by remember { mutableLongStateOf(0L) }
     var dur by remember { mutableLongStateOf(0L) }
 
     fun saveProgress() {
-        if (!isLive && overrideUrl == null && engine.duration > 0) state.store.saveProgress(media, engine.position, engine.duration)
+        if (!isLive && (overrideUrl == null || external) && engine.duration > 0) state.store.saveProgress(media, engine.position, engine.duration)
     }
 
     DisposableEffect(engine) {
@@ -273,7 +277,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
     fun zap(delta: Int) {
         if (list.size < 2) return
         saveProgress()
-        overrideUrl = null; subtitle = null
+        overrideUrl = null; subtitle = null; external = false
         index = (index + delta + list.size) % list.size
         overlay = true; bump++
     }
@@ -346,6 +350,26 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
             }
         }
 
+        // Estatísticas para nerds (canto superior esquerdo, atualiza a cada segundo).
+        if (showStats) {
+            var rows by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
+            LaunchedEffect(engine) { while (true) { rows = runCatching { engine.stats() }.getOrDefault(emptyList()); delay(1000) } }
+            Column(
+                Modifier.align(Alignment.TopStart).safeDrawingPadding().padding(start = 24.dp, top = if (overlay) 84.dp else 24.dp)
+                    .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text("Estatísticas para nerds", color = Z.Cyan, style = MaterialTheme.typography.labelSmall)
+                rows.forEach { (k, v) ->
+                    Row {
+                        Text(k, color = Color.White.copy(alpha = 0.6f), fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 12.sp, modifier = Modifier.width(78.dp))
+                        Text(v, color = Color.White, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
         // Pular abertura / próximo episódio (aparece mesmo com os controles escondidos)
         AnimatedVisibility(
             (inIntro || inCredits) && !showChannels, enter = fadeIn(), exit = fadeOut(),
@@ -364,7 +388,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                 ) {
                     if (!tv) IconGlassButton(Icons.AutoMirrored.Outlined.ArrowBack, "Voltar", { state.pop() }, size = 44.dp)
                     Spacer(Modifier.weight(1f))
-                    if (isLive) Badge("AO VIVO", Z.Live) else if (overrideUrl != null) Badge("REPLAY", Z.Cyan)
+                    if (isLive) Badge("AO VIVO", Z.Live) else if (overrideUrl != null) Badge(if (external) "OUTRA FONTE" else "REPLAY", Z.Cyan)
                     es.videoSize?.let { Badge(it) }
                 }
 
@@ -460,6 +484,12 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                             }, tint = if (on) Z.Cyan else Z.Text, active = on)
                         }
                         item {
+                            IconGlassButton(Icons.Outlined.QueryStats, "Estatísticas para nerds", {
+                                showStats = !showStats
+                                state.store.updateSettings { it.copy(nerdStats = showStats) }
+                            }, tint = if (showStats) Z.Cyan else Z.Text, active = showStats)
+                        }
+                        item {
                             IconGlassButton(Icons.Outlined.AspectRatio, "Proporção: ${aspect.label}", {
                                 aspect = AspectMode.entries[(aspect.ordinal + 1) % AspectMode.entries.size]
                                 engine.setAspect(aspect); state.showToast("Proporção: ${aspect.label}")
@@ -496,7 +526,7 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                 itemsIndexed(list) { i, c ->
                     val now = state.epg.nowNext(c).first
                     Focusable(
-                        { overrideUrl = null; subtitle = null; index = i; showChannels = false; overlay = true; bump++ },
+                        { overrideUrl = null; subtitle = null; external = false; index = i; showChannels = false; overlay = true; bump++ },
                         Modifier.fillMaxWidth().then(if (i == index) Modifier.focusRequester(firstFr) else Modifier),
                         RoundedCornerShape(16.dp), glass = i == index, selected = i == index, focusScale = 1.02f
                     ) {

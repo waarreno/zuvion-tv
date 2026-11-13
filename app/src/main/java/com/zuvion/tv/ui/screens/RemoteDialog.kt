@@ -100,8 +100,11 @@ fun PhoneRemoteDialog(mode: String, onDismiss: () -> Unit) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("1. Conecte o celular na mesma rede Wi-Fi da TV.", color = Z.Text, style = MaterialTheme.typography.bodyMedium)
                     Text("2. Aponte a câmera para o código.", color = Z.Text, style = MaterialTheme.typography.bodyMedium)
-                    Text(if (mode == "search") "3. Digite a busca: o texto aparece aqui na hora."
-                        else "3. Preencha os dados da lista e toque em Enviar.", color = Z.Text, style = MaterialTheme.typography.bodyMedium)
+                    Text(when (mode) {
+                        "search" -> "3. Digite a busca: o texto aparece aqui na hora."
+                        "addon" -> "3. Cole o link do addon e toque em Enviar."
+                        else -> "3. Preencha os dados da lista e toque em Enviar."
+                    }, color = Z.Text, style = MaterialTheme.typography.bodyMedium)
                     Text("Ou abra no navegador:", color = Z.Muted, style = MaterialTheme.typography.labelMedium)
                     Text(u.substringBefore("&m="), color = Z.Violet, style = MaterialTheme.typography.labelMedium)
                 }

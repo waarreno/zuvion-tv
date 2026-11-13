@@ -124,6 +124,12 @@ data class Settings(
     val profileSetupDone: Boolean = false,
     /** Realce de imagem: off | soft | strong. */
     val enhance: String = "off",
+    /** Mostra o painel "estatísticas para nerds" no player. */
+    val nerdStats: Boolean = false,
+    /** Organiza TV ao vivo, filmes e séries pelos gêneros do app (false = categorias do provedor). */
+    val genreMode: Boolean = true,
+    /** Addons no formato do Stremio (links do manifest.json), usados como fontes extras. */
+    val stremioAddons: List<String> = emptyList(),
     /** Continuar assistindo: entra a partir de X% e sai (concluído) a partir de Y%. */
     val continueMinPct: Int = 5,
     val continueMaxPct: Int = 90

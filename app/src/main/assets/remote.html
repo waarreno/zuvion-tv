@@ -57,7 +57,7 @@
     <div><b>Zuvion <span>TV</span></b><small>Digite aqui, aparece na TV</small></div>
   </header>
 
-  <div class="tabs">
+  <div class="tabs" id="tabs">
     <button class="chip" data-tab="login">Adicionar lista</button>
     <button class="chip" data-tab="search">Buscar</button>
   </div>
@@ -83,6 +83,13 @@
     <input id="q" placeholder="Digite para buscar na TV" autocomplete="off" enterkeyhint="search">
     <button class="primary" id="go">Buscar na TV</button>
     <div class="msg" id="searchMsg"></div>
+  </section>
+
+  <section id="addon" class="glass hide">
+    <label for="au">Link do addon (manifest.json)</label>
+    <input id="au" inputmode="url" autocapitalize="off" autocomplete="off" placeholder="https://…/manifest.json" enterkeyhint="send">
+    <button class="primary" id="ago">Enviar para a TV</button>
+    <div class="msg" id="addonMsg"></div>
   </section>
 
   <p class="note">O celular e a TV precisam estar na mesma rede Wi-Fi. Os dados vão direto para a TV, sem passar pela internet.</p>
@@ -133,8 +140,20 @@
   $('go').onclick = search;
   $('q').onkeydown = e => { if (e.key === 'Enter') search(); };
 
+  const sendAddon = async () => {
+    try { await post('/search', { text: $('au').value.trim(), final: 'true' }); msg($('addonMsg'), 'Enviado! Confira a TV.', true); }
+    catch (e) { msg($('addonMsg'), 'Não foi possível enviar: ' + e.message, false); }
+  };
+  $('ago').onclick = sendAddon;
+  $('au').onkeydown = e => { if (e.key === 'Enter') sendAddon(); };
+
   setType('XTREAM');
-  showTab(params.get('m') === 'search' ? 'search' : 'login');
+  if (params.get('m') === 'addon') {
+    $('tabs').classList.add('hide');
+    ['login', 'search'].forEach(s => $(s).classList.add('hide'));
+    $('addon').classList.remove('hide');
+    $('au').focus();
+  } else showTab(params.get('m') === 'search' ? 'search' : 'login');
 </script>
 </body>
 </html>

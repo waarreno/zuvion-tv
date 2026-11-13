@@ -50,6 +50,9 @@ import com.zuvion.tv.ui.theme.Z
 import com.zuvion.tv.ui.theme.fadeEdges
 import com.zuvion.tv.ui.theme.glass
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.QrCode2
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material.icons.outlined.RadioButtonChecked
@@ -119,6 +122,8 @@ fun SettingsScreen(state: AppState) {
     var newPin by remember { mutableStateOf("") }
     var epgEdit by remember { mutableStateOf<Playlist?>(null) }
     var keyEdit by remember { mutableStateOf<String?>(null) } // tmdb | omdb | intro
+    var addingAddon by remember { mutableStateOf(false) }
+    var removingAddon by remember { mutableStateOf<String?>(null) }
     var deleting by remember { mutableStateOf<Playlist?>(null) }
     val lib by state.repo.library.collectAsState()
 
@@ -214,6 +219,42 @@ fun SettingsScreen(state: AppState) {
                     Text("Gravações", style = MaterialTheme.typography.titleLarge, color = Z.Text, modifier = Modifier.weight(1f))
                     Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = Z.Muted)
                 }
+            }
+        }
+
+        item {
+            Section("Organização") {
+                Text("Com os gêneros do Zuvion, filmes e séries ficam agrupados pelos gêneros do TMDB (Ação, Comédia, Drama…) " +
+                    "e os canais por tipo (Abertos, Esportes, Notícias, Infantil…). Desligado, aparecem as categorias do seu provedor.",
+                    color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
+                ToggleRow("Organizar por gêneros", s.genreMode) { v ->
+                    state.store.updateSettings { it.copy(genreMode = v) }
+                    if (v) state.repo.enrichGenres()
+                }
+            }
+        }
+
+        item {
+            Section("Outras fontes (addons do Stremio)") {
+                Text("Addons no formato do Stremio que oferecem links diretos podem servir de fonte extra para filmes e episódios: " +
+                    "use “Outras fontes” na tela do título. Links de torrent não são usados. O conteúdo vem do addon, não do Zuvion.",
+                    color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
+                s.stremioAddons.forEach { u ->
+                    val name by produceState(u.removePrefix("https://").substringBefore('/'), u) {
+                        runCatching { com.zuvion.tv.data.Stremio.manifest(u).name }.getOrNull()?.let { value = it }
+                    }
+                    Focusable({ removingAddon = u }, Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), glass = false, focusScale = 1.01f) {
+                        Row(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(name, color = Z.Text, style = MaterialTheme.typography.bodyLarge)
+                                Text(u.removePrefix("https://").removePrefix("http://"), color = Z.Muted, style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            }
+                            Icon(Icons.Outlined.Close, "Remover", tint = Z.Muted)
+                        }
+                    }
+                }
+                PillButton("Adicionar addon", { addingAddon = true }, icon = Icons.Outlined.Add)
             }
         }
 
@@ -375,6 +416,22 @@ fun SettingsScreen(state: AppState) {
         }
     }
 
+    if (addingAddon) AddAddonDialog(state, tv) { addingAddon = false }
+
+    removingAddon?.let { u ->
+        GlassDialog({ removingAddon = null }) {
+            Text("Remover este addon?", style = MaterialTheme.typography.headlineMedium, color = Z.Text)
+            Text(u, color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                PillButton("Remover", {
+                    state.store.updateSettings { it.copy(stremioAddons = it.stremioAddons - u) }
+                    removingAddon = null; state.showToast("Addon removido")
+                }, Modifier.weight(1f), primary = true)
+                PillButton("Cancelar", { removingAddon = null }, Modifier.weight(1f))
+            }
+        }
+    }
+
     epgEdit?.let { p ->
         var url by remember(p.id) { mutableStateOf(p.epgUrl) }
         GlassDialog({ epgEdit = null }) {
@@ -385,6 +442,53 @@ fun SettingsScreen(state: AppState) {
                 state.store.update { d -> d.copy(playlists = d.playlists.map { if (it.id == p.id) it.copy(epgUrl = url.trim()) else it }) }
                 epgEdit = null; state.repo.refresh()
             }, Modifier.fillMaxWidth(), primary = true)
+        }
+    }
+}
+
+
+/** Adiciona um addon pelo link do manifest (digitado ou enviado pelo celular). */
+@Composable
+private fun AddAddonDialog(state: AppState, tv: Boolean, onDismiss: () -> Unit) {
+    var url by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var phone by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        com.zuvion.tv.remote.RemoteServer.events.collect { ev ->
+            if (ev is com.zuvion.tv.remote.RemoteEvent.Search && ev.final) { url = ev.text.trim(); phone = false }
+        }
+    }
+    if (phone) PhoneRemoteDialog("addon") { phone = false }
+    fun save() {
+        val u = com.zuvion.tv.data.Stremio.normalize(url)
+        busy = true; error = null
+        scope.launch {
+            val r = runCatching { com.zuvion.tv.data.Stremio.manifest(u) }
+            busy = false
+            r.onSuccess { a ->
+                when {
+                    !a.hasStreams -> error = "“${a.name}” não oferece links de vídeo."
+                    u in state.store.settings.stremioAddons -> error = "Este addon já foi adicionado."
+                    else -> {
+                        state.store.updateSettings { it.copy(stremioAddons = it.stremioAddons + u) }
+                        state.showToast("Addon “${a.name}” adicionado"); onDismiss()
+                    }
+                }
+            }.onFailure { error = "Não foi possível ler o addon. Confira o link (termina em manifest.json)." }
+        }
+    }
+    GlassDialog(onDismiss) {
+        Text("Adicionar addon", style = MaterialTheme.typography.headlineMedium, color = Z.Text)
+        Text("Cole o link de instalação do addon (manifest.json). O link do botão “Instalar” do Stremio (stremio://…) também serve.",
+            color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
+        GlassField("https://…/manifest.json", url, { url = it; error = null }, last = true)
+        error?.let { Text(it, color = Z.Live) }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            PillButton(if (busy) "Verificando…" else "Adicionar", { if (!busy && url.isNotBlank()) save() }, Modifier.weight(1f), primary = true)
+            if (tv) PillButton("Pelo celular", { phone = true }, Modifier.weight(1f), icon = Icons.Outlined.QrCode2)
+            else PillButton("Cancelar", onDismiss, Modifier.weight(1f))
         }
     }
 }

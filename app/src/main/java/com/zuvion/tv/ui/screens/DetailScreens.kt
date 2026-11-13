@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -110,6 +111,8 @@ fun MovieDetailScreen(state: AppState, base: Content) {
     }
     val poster = m?.poster ?: item.poster
     val genres = m?.genres.orEmpty()
+    var sources by remember { mutableStateOf(false) }
+    if (sources) SourcesDialog(state, playable, base, listOf(playable)) { sources = false }
 
     Box(Modifier.fillMaxSize()) {
         Backdrop(m?.backdrop ?: poster)
@@ -157,6 +160,7 @@ fun MovieDetailScreen(state: AppState, base: Content) {
                     }, icon = Icons.Outlined.Close)
                     PillButton(if (fav) "Na sua lista" else "Minha lista", { state.store.toggleFavorite(base) },
                         icon = if (fav) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder)
+                    if (data.settings.stremioAddons.isNotEmpty()) PillButton("Outras fontes", { sources = true }, icon = Icons.Outlined.Hub)
                 }
             }
         }
@@ -204,6 +208,9 @@ private fun SeriesBody(
     }
     val allEpisodes = i.seasons.toSortedMap().flatMap { (sn, list) -> if (sn == season) episodes else list.map { it.copy(tmdbId = tmdbId) } }
     val genres = m?.genres.orEmpty()
+    val hasSources = data.settings.stremioAddons.isNotEmpty()
+    var sourcesFor by remember { mutableStateOf<Content?>(null) }
+    sourcesFor?.let { e -> SourcesDialog(state, e, series, allEpisodes) { sourcesFor = null } }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().fadeEdges(),
@@ -233,6 +240,7 @@ private fun SeriesBody(
                         }, icon = Icons.Outlined.Close)
                         PillButton(if (fav) "Na sua lista" else "Minha lista", { state.store.toggleFavorite(series) },
                             icon = if (fav) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder)
+                        if (hasSources && target != null) PillButton("Outras fontes · T${target.season}·E${target.episode}", { sourcesFor = target }, icon = Icons.Outlined.Hub)
                     }
                 }
             }
@@ -250,7 +258,9 @@ private fun SeriesBody(
                     WideCard(
                         "E${e.episode} · ${e.name}", e.poster, { state.play(e, allEpisodes) },
                         width = if (tv) 260.dp else 200.dp, progress = pr?.fraction,
-                        subtitle = e.plot
+                        subtitle = e.plot,
+                        // Segurar OK (ou toque longo): outras fontes deste episódio.
+                        onLongClick = if (hasSources) ({ sourcesFor = e }) else null
                     )
                 }
             }

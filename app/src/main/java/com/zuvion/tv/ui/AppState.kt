@@ -59,7 +59,9 @@ sealed interface Screen {
         val list: List<Content>,
         val startMs: Long = 0,
         val overrideUrl: String? = null,
-        val subtitle: String? = null
+        val subtitle: String? = null,
+        /** Link de outra fonte (addon) para o mesmo filme/episódio: o progresso conta normalmente. */
+        val external: Boolean = false
     ) : Screen
     data class Multi(val first: Content, val list: List<Content>) : Screen
 }
@@ -113,10 +115,10 @@ class AppState(val app: ZuvionApp) {
         }
     }
 
-    fun play(item: Content, list: List<Content> = listOf(item), startMs: Long? = null, overrideUrl: String? = null, subtitle: String? = null) {
+    fun play(item: Content, list: List<Content> = listOf(item), startMs: Long? = null, overrideUrl: String? = null, subtitle: String? = null, external: Boolean = false) {
         val s = store.settings
         val resume = startMs ?: store.progressOf(item)?.takeIf { it.fraction in 0.01f..(s.continueMaxPct / 100f) }?.positionMs ?: 0
-        push(Screen.Player(item, list, resume, overrideUrl, subtitle))
+        push(Screen.Player(item, list, resume, overrideUrl, subtitle, external))
     }
 
     fun needsPin(categoryId: String, adult: Boolean): Boolean =

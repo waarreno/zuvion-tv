@@ -7,6 +7,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.zuvion.tv.data.ContentRepository
 import com.zuvion.tv.data.EpgRepository
+import com.zuvion.tv.data.GenreIndex
 import com.zuvion.tv.data.Store
 import com.zuvion.tv.meta.Metadata
 import com.zuvion.tv.source.Http
@@ -33,9 +34,9 @@ class ZuvionApp : Application(), ImageLoaderFactory {
         store = Store(this, scope)
         store.ensureDefaultProfile()
         epg = EpgRepository(this)
-        repo = ContentRepository(this, store, epg, scope)
-        updater = Updater(this)
         meta = Metadata(this, store)
+        repo = ContentRepository(this, store, epg, scope, GenreIndex(this, meta, scope))
+        updater = Updater(this)
     }
 
     override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)

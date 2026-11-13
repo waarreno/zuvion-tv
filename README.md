@@ -47,6 +47,9 @@ Player IPTV gratuito para <b>celular</b> e <b>Android TV / Google TV</b>, com vi
 - **Realce de imagem:** amplia vídeos abaixo de Full HD e reforça a nitidez na placa de vídeo do aparelho (suave ou forte), ligado quando você quiser.
 - **Barra de progresso navegável:** no controle, ◀ ▶ sobre a barra avançam ou voltam, e o passo acelera ao segurar. No celular, basta tocar ou arrastar.
 - **Tema claro ou escuro.**
+- **Organização por gêneros:** filmes e séries agrupados pelos gêneros do TMDB e canais por tipo (Abertos, Esportes, Notícias, Infantil…). Também dá para usar as categorias do provedor.
+- **Outras fontes:** addons no formato do Stremio que oferecem links diretos podem ser adicionados como fonte extra para filmes e episódios.
+- **Estatísticas para nerds** no player: resolução, codec, quadros, buffer e conexão.
 - **Digitar pelo celular:** na TV, um QR Code abre uma página no celular para digitar o login ou a busca, sem usar o controle.
 - **Um canal, vários formatos:** canais e filmes em SD, HD, Full HD e 4K aparecem uma vez só; o formato é escolhido no player e o app lembra a sua escolha.
 - **Abre rápido:** a lista fica salva no aparelho e é atualizada a cada 24 horas, ou quando você quiser.

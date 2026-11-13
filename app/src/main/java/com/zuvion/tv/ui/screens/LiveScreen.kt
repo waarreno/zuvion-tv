@@ -54,9 +54,14 @@ const val CAT_FAV = "__fav"
 @Composable
 fun rememberCategoryPicker(state: AppState, kind: Kind): Triple<List<Category>, String, (Category) -> Unit> {
     val lib by state.repo.library.collectAsState()
-    val cats = remember(lib) {
-        listOf(Category(CAT_FAV, "Favoritos", kind), Category(CAT_ALL, "Todos", kind)) + state.repo.categories(kind)
+    val data by state.store.data.collectAsState()
+    val genreMode = data.settings.genreMode
+    val base = remember(kind) { listOf(Category(CAT_FAV, "Favoritos", kind), Category(CAT_ALL, "Todos", kind)) }
+    // Gêneros (ou categorias do provedor) montados fora da thread da tela.
+    val extra by produceState(emptyList<Category>(), lib, genreMode, data.settings.hideAdult, data.settings.activeProfileId) {
+        value = state.repo.categoryList(kind)
     }
+    val cats = remember(extra) { base + extra }
     var selected by remember(kind) { mutableStateOf(if (state.store.profileData().favorites.any { it.kind == kind }) CAT_FAV else CAT_ALL) }
     var pinFor by remember { mutableStateOf<Category?>(null) }
     pinFor?.let { c ->
