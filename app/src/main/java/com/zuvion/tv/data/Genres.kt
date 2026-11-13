@@ -73,7 +73,7 @@ object Genres {
         "Filmes e Séries" to listOf("hbo", "telecine", "megapix", "tnt", "warner", "axn", "sony", "universal", "fx", "space",
             "cinemax", "paramount", "star channel", "amc", "tcm", "film", "cine", "movie", "serie", "a e", "canal brasil",
             "prime box", "studio", "lifetime", "24h", "24 h", "24 horas"),
-        "Variedades" to listOf("gnt", "viva", "canal off", "tlc", "food network", "hgtv", "home health", "comedy central",
+        "Variedades" to listOf("fazenda", "camera", "gnt", "viva", "canal off", "tlc", "food network", "hgtv", "home health", "comedy central",
             "woohoo", "arte 1", "arte1", "travel", "fashion", "e entertainment", "variedade", "entretenimento", "reality", "bbb"),
         "Abertos" to listOf("globo", "sbt", "record", "band", "redetv", "rede tv", "cultura", "tv brasil", "gazeta", "cnt",
             "rede minas", "tve", "tv camara", "tv senado", "tv justica", "aberto", "aberta", "regiona", "local"),
@@ -107,8 +107,27 @@ object Genres {
     /** A palavra-chave começa no início de uma palavra do texto normalizado. */
     private fun has(n: String, kw: String) = n.contains(" $kw")
 
+    /** Só palavras inequívocas: "hot" sozinho pega "Hot Wheels" e canais HOT; "adult" pega "Adult Swim". */
+    fun adultTitle(name: String): Boolean {
+        val n = name.lowercase()
+        return listOf("xxx", "porn", "+18", "18+", "erotic", "erótic", "adulto").any { n.contains(it) } ||
+            (n.contains("adult") && !n.contains("adult swim"))
+    }
+
+    /** Prefixo de país no nome ("[IL] …", "US: …", "PT | …"), exceto Brasil. */
+    private fun foreignPrefix(name: String): Boolean {
+        val t = name.trim()
+        val code = when {
+            t.startsWith("[") && t.indexOf(']') in 3..4 -> t.substring(1, t.indexOf(']'))
+            t.length > 4 && t[0].isLetter() && t[1].isLetter() && (t[2] == ':' || t[2] == '|' || (t[2] == ' ' && (t[3] == '|' || t[3] == ':'))) -> t.substring(0, 2)
+            else -> return false
+        }.trim()
+        return code.length in 2..3 && code.all { it in 'A'..'Z' } && code != "BR"
+    }
+
     fun liveGroup(channel: Content, category: Category?): String {
-        if (category?.adult == true || isAdultName(channel.name)) return ADULT
+        if (category?.adult == true || adultTitle(channel.name)) return ADULT
+        if (foreignPrefix(channel.name)) return "Internacionais"
         val byName = norm(channel.name)
         liveGroups.firstOrNull { (_, kws) -> kws.any { has(byName, it) } }?.let { return it.first }
         val byCat = category?.name?.let { norm(it) } ?: return OTHERS
@@ -137,8 +156,10 @@ object Genres {
     }
 
     /** Ordem das abas de gêneros de filmes/séries: Lançamentos, gêneros em ordem alfabética, Outros, Adultos. */
+    private val collator = java.text.Collator.getInstance(java.util.Locale("pt", "BR"))
+
     fun vodOrder(names: Collection<String>): List<String> {
-        val middle = names.filter { it != RELEASES && it != OTHERS && it != ADULT }.sortedWith(String.CASE_INSENSITIVE_ORDER)
+        val middle = names.filter { it != RELEASES && it != OTHERS && it != ADULT }.sortedWith(collator)
         return listOfNotNull(RELEASES.takeIf { it in names }) + middle +
             listOfNotNull(OTHERS.takeIf { it in names }, ADULT.takeIf { it in names })
     }

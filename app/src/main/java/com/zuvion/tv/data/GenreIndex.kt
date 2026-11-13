@@ -23,7 +23,7 @@ private class GenreCache(val entries: List<GenreEntry> = emptyList())
 
 /**
  * Gêneros do TMDB de cada título da lista, consultados aos poucos em segundo plano
- * (uma busca por título, 4 de cada vez) e guardados no aparelho. Títulos ainda não
+ * (uma busca por título, 8 de cada vez) e guardados no aparelho. Títulos ainda não
  * consultados usam o nome da categoria do provedor.
  */
 @OptIn(ExperimentalSerializationApi::class)
@@ -66,7 +66,7 @@ class GenreIndex(private val context: Context, private val meta: Metadata, priva
             val work = HashMap(map)
             var done = 0
             var lastSave = 0
-            for (chunk in todo.chunked(4)) {
+            for (chunk in todo.chunked(8)) {
                 val res = coroutineScope { chunk.map { c -> async { c to meta.tmdbGenres(c) } }.awaitAll() }
                 var fails = 0
                 res.forEach { (c, ids) -> if (ids != null) work[keyOf(c)] = ids else fails++ }

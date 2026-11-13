@@ -257,7 +257,7 @@ class ContentRepository(
         for (c in lib.items[kind].orEmpty()) {
             val cat = cats[c.categoryId]
             if (kind == Kind.LIVE) { add(Genres.liveGroup(c, cat), c); continue }
-            if (cat?.adult == true || isAdultName(c.name)) { add(Genres.ADULT, c); continue }
+            if (cat?.adult == true || Genres.adultTitle(c.name)) { add(Genres.ADULT, c); continue }
             val g = genres.idsOf(c)?.let { Genres.fromTmdb(kind, it) }?.takeIf { it.isNotEmpty() } ?: Genres.fromCategory(kind, cat)
             if (g.isEmpty()) add(Genres.OTHERS, c) else g.forEach { add(it, c) }
             if (Genres.isRelease(c, cat)) add(Genres.RELEASES, c)
