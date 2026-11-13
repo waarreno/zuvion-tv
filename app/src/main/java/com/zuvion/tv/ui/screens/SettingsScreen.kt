@@ -124,6 +124,7 @@ fun SettingsScreen(state: AppState) {
     var keyEdit by remember { mutableStateOf<String?>(null) } // tmdb | omdb | intro
     var addingAddon by remember { mutableStateOf(false) }
     var removingAddon by remember { mutableStateOf<String?>(null) }
+    val addAddonFr = remember { androidx.compose.ui.focus.FocusRequester() }
     var deleting by remember { mutableStateOf<Playlist?>(null) }
     val lib by state.repo.library.collectAsState()
 
@@ -254,7 +255,7 @@ fun SettingsScreen(state: AppState) {
                         }
                     }
                 }
-                PillButton("Adicionar addon", { addingAddon = true }, icon = Icons.Outlined.Add)
+                PillButton("Adicionar addon", { addingAddon = true }, Modifier.focusRequester(addAddonFr), icon = Icons.Outlined.Add)
             }
         }
 
@@ -426,6 +427,8 @@ fun SettingsScreen(state: AppState) {
                 PillButton("Remover", {
                     state.store.updateSettings { it.copy(stremioAddons = it.stremioAddons - u) }
                     removingAddon = null; state.showToast("Addon removido")
+                    // A linha removida tinha o foco: leva para "Adicionar addon" (não para o menu lateral).
+                    scope.launch { kotlinx.coroutines.delay(80); runCatching { addAddonFr.requestFocus() } }
                 }, Modifier.weight(1f), primary = true)
                 PillButton("Cancelar", { removingAddon = null }, Modifier.weight(1f))
             }

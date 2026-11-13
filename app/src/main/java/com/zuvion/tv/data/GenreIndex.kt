@@ -71,7 +71,10 @@ class GenreIndex(private val context: Context, private val meta: Metadata, priva
                 var fails = 0
                 res.forEach { (c, ids) -> if (ids != null) work[keyOf(c)] = ids else fails++ }
                 done += chunk.size
-                if (done - lastSave >= 300) { lastSave = done; publish(work) }
+                if (done - lastSave >= 300) {
+                    lastSave = done; publish(work)
+                    android.util.Log.i("Zuvion", "gêneros: $done/${todo.size} (${work.values.count { it.isNotEmpty() }} com gênero)")
+                }
                 // Sem rede ou limite do TMDB: espera um pouco antes de seguir.
                 if (fails == chunk.size) delay(5000)
             }

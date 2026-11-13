@@ -63,7 +63,7 @@ fun SourcesDialog(state: AppState, item: Content, title: Content, list: List<Con
                 s.streams.forEachIndexed { i, x ->
                     Focusable({
                         onDismiss()
-                        state.play(item, list, overrideUrl = x.url, subtitle = x.addon, external = true)
+                        state.play(item, list, overrideUrl = x.url, external = true)
                     }, Modifier.fillMaxWidth().let { if (i == 0) it.focusRequester(fr) else it }, RoundedCornerShape(18.dp), focusScale = 1.01f) {
                         Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
