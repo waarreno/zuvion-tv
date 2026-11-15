@@ -100,6 +100,22 @@ class Store(context: Context, private val scope: CoroutineScope) {
     /** Tira do "Continuar assistindo" e zera o progresso. */
     fun removeProgress(c: Content) = updateProfileData { pd -> pd.copy(history = pd.history.filterNot { it.item.key == c.key }, watched = pd.watched - c.key) }
 
+    /**
+     * Até a 1.6.1, ao passar para o próximo episódio, a posição do novo era gravada no anterior.
+     * Uma vez só: tira do "continuar" os episódios já concluídos que ganharam essa posição errada.
+     */
+    fun fixEpisodeHistory() {
+        if (settings.episodeHistoryFixed) return
+        update { d ->
+            d.copy(
+                profileData = d.profileData.mapValues { (_, pd) ->
+                    pd.copy(history = pd.history.filterNot { it.item.kind == Kind.EPISODE && pd.watched.containsKey(it.item.key) })
+                },
+                settings = d.settings.copy(episodeHistoryFixed = true)
+            )
+        }
+    }
+
     fun isWatched(c: Content): Boolean = profileData().watched.containsKey(c.key)
 
     fun progressOf(c: Content): HistoryEntry? = profileData().history.firstOrNull { it.item.key == c.key }

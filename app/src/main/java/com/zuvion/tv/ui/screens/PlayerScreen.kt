@@ -181,8 +181,12 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
     var pos by remember { mutableLongStateOf(0L) }
     var dur by remember { mutableLongStateOf(0L) }
 
+    // Valores atuais lidos na hora de salvar: o salvamento ao sair e o periódico foram criados no
+    // primeiro episódio e, sem isto, gravavam a posição do episódio seguinte no anterior.
+    val current = androidx.compose.runtime.rememberUpdatedState(Triple(media, isLive, overrideUrl == null || external))
     fun saveProgress() {
-        if (!isLive && (overrideUrl == null || external) && engine.duration > 0) state.store.saveProgress(media, engine.position, engine.duration)
+        val (m, live, own) = current.value
+        if (!live && own && engine.duration > 0) state.store.saveProgress(m, engine.position, engine.duration)
     }
 
     DisposableEffect(engine) {

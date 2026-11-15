@@ -134,6 +134,8 @@ data class Settings(
     val stremioAddons: List<String> = emptyList(),
     /** Token da API do Real-Debrid: converte links de torrent dos addons em link direto. */
     val realDebridToken: String = "",
+    /** Correção única do histórico de episódios gravado errado até a 1.6.1. */
+    val episodeHistoryFixed: Boolean = false,
     /** Continuar assistindo: entra a partir de X% e sai (concluído) a partir de Y%. */
     val continueMinPct: Int = 5,
     val continueMaxPct: Int = 90

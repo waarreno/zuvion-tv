@@ -33,6 +33,7 @@ class ZuvionApp : Application(), ImageLoaderFactory {
         runCatching { cacheDir.resolve("updates").deleteRecursively() }
         store = Store(this, scope)
         store.ensureDefaultProfile()
+        store.fixEpisodeHistory()
         epg = EpgRepository(this)
         meta = Metadata(this, store)
         repo = ContentRepository(this, store, epg, scope, GenreIndex(this, meta, scope))
