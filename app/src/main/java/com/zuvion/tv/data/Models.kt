@@ -95,7 +95,9 @@ data class HistoryEntry(
 @Serializable
 data class ProfileData(
     val favorites: List<Content> = emptyList(),
-    val history: List<HistoryEntry> = emptyList()
+    val history: List<HistoryEntry> = emptyList(),
+    /** Concluídos (chave -> quando terminou), para marcar episódios vistos e achar o próximo. */
+    val watched: Map<String, Long> = emptyMap()
 )
 
 @Serializable
@@ -130,6 +132,8 @@ data class Settings(
     val genreMode: Boolean = true,
     /** Addons no formato do Stremio (links do manifest.json), usados como fontes extras. */
     val stremioAddons: List<String> = emptyList(),
+    /** Token da API do Real-Debrid: converte links de torrent dos addons em link direto. */
+    val realDebridToken: String = "",
     /** Continuar assistindo: entra a partir de X% e sai (concluído) a partir de Y%. */
     val continueMinPct: Int = 5,
     val continueMaxPct: Int = 90

@@ -24,7 +24,11 @@ data class StremioAddon(
     val base: String get() = manifestUrl.removeSuffix("/manifest.json")
 }
 
-data class StremioStream(val addon: String, val title: String, val detail: String, val url: String)
+/** Link de um addon: [url] direto, ou torrent ([infoHash]) que o Real-Debrid converte. */
+data class StremioStream(
+    val addon: String, val title: String, val detail: String, val url: String?,
+    val infoHash: String? = null, val fileIdx: Int? = null, val filename: String? = null
+)
 
 object Stremio {
     private val manifests = ConcurrentHashMap<String, StremioAddon>()
@@ -68,7 +72,7 @@ object Stremio {
      * Links de todos os addons para um filme ("movie", "tt123") ou episódio ("series", "tt123:1:2").
      * Só entram links HTTP diretos (torrents e links externos ficam de fora).
      */
-    suspend fun streams(addonUrls: List<String>, type: String, id: String): List<StremioStream> = withContext(Dispatchers.IO) {
+    suspend fun streams(addonUrls: List<String>, type: String, id: String, torrents: Boolean = false): List<StremioStream> = withContext(Dispatchers.IO) {
         coroutineScope {
             addonUrls.map { u ->
                 async {
@@ -79,15 +83,19 @@ object Stremio {
                             if (a.idPrefixes != null && a.idPrefixes.none { id.startsWith(it) }) return@runCatching emptyList<StremioStream>()
                             val o = Http.getJson("${a.base}/stream/$type/$id.json").obj()
                             o?.get("streams").arr().orEmpty().mapNotNull { it.obj() }.mapNotNull { s ->
-                                val url = s.str("url")?.takeIf { it.startsWith("http://") || it.startsWith("https://") } ?: return@mapNotNull null
+                                val url = s.str("url")?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
+                                val hash = s.str("infoHash")?.takeIf { torrents && url == null && it.length >= 32 }
+                                if (url == null && hash == null) return@mapNotNull null
                                 val name = s.str("name")?.replace('\n', ' ')?.trim()
                                 val desc = (s.str("title") ?: s.str("description"))?.trim().orEmpty()
-                                StremioStream(a.name, name?.ifBlank { null } ?: desc.lineSequence().firstOrNull().orEmpty().ifBlank { a.name }, desc, url)
+                                StremioStream(a.name, name?.ifBlank { null } ?: desc.lineSequence().firstOrNull().orEmpty().ifBlank { a.name }, desc, url,
+                                    infoHash = hash, fileIdx = s.str("fileIdx")?.toIntOrNull(),
+                                    filename = s["behaviorHints"].obj()?.str("filename"))
                             }
                         }.getOrDefault(emptyList())
                     }.orEmpty()
                 }
-            }.awaitAll().flatten()
+            }.awaitAll().flatten().sortedBy { if (it.infoHash == null) 0 else 1 }
         }
     }
 }

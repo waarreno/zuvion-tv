@@ -148,7 +148,11 @@
   $('au').onkeydown = e => { if (e.key === 'Enter') sendAddon(); };
 
   setType('XTREAM');
-  if (params.get('m') === 'addon') {
+  if (params.get('m') === 'token') {
+    document.querySelector('label[for="au"]').textContent = 'Chave ou token';
+    $('au').placeholder = 'Cole aqui';
+  }
+  if (params.get('m') === 'addon' || params.get('m') === 'token') {
     $('tabs').classList.add('hide');
     ['login', 'search'].forEach(s => $(s).classList.add('hide'));
     $('addon').classList.remove('hide');

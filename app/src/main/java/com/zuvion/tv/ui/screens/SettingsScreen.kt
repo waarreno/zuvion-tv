@@ -256,6 +256,10 @@ fun SettingsScreen(state: AppState) {
                     }
                 }
                 PillButton("Adicionar addon", { addingAddon = true }, Modifier.focusRequester(addAddonFr), icon = Icons.Outlined.Add)
+                Text("Com o Real-Debrid, os links de torrent dos addons (ex.: Torrentio) também aparecem e tocam como link direto. " +
+                    "Addons já configurados com o seu debrid funcionam mesmo sem isto.",
+                    color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
+                KeyRow("Real-Debrid", s.realDebridToken, "real-debrid.com/apitoken", false) { keyEdit = "rd" }
             }
         }
 
@@ -393,14 +397,23 @@ fun SettingsScreen(state: AppState) {
         val (title, current) = when (k) {
             "tmdb" -> "Chave do TMDB" to s.tmdbKey
             "omdb" -> "Chave do OMDb" to s.omdbKey
+            "rd" -> "Token do Real-Debrid" to s.realDebridToken
             else -> "Chave do TheIntroDB" to s.introDbKey
         }
         var v by remember(k) { mutableStateOf(current) }
+        var keyPhone by remember(k) { mutableStateOf(false) }
+        LaunchedEffect(k) {
+            com.zuvion.tv.remote.RemoteServer.events.collect { ev ->
+                if (ev is com.zuvion.tv.remote.RemoteEvent.Search && ev.final) { v = ev.text.trim(); keyPhone = false }
+            }
+        }
+        if (keyPhone) PhoneRemoteDialog("token") { keyPhone = false }
         GlassDialog({ keyEdit = null }) {
             Text(title, style = MaterialTheme.typography.headlineMedium, color = Z.Text)
             Text(when (k) {
                 "tmdb" -> "Aceita a “Chave da API” (v3) ou o “Token de leitura” (v4). Cadastro gratuito em themoviedb.org."
                 "omdb" -> "Chave gratuita em omdbapi.com (até 1.000 consultas por dia)."
+                "rd" -> "Abra real-debrid.com/apitoken (com a sua conta) e copie o token. Na TV, use “Pelo celular” para colar."
                 else -> "Opcional: o TheIntroDB funciona sem chave."
             }, color = Z.Muted, style = MaterialTheme.typography.bodyMedium)
             GlassField("Chave", v, { v = it.trim() }, last = true)
@@ -408,10 +421,15 @@ fun SettingsScreen(state: AppState) {
                 PillButton("Salvar", {
                     val value = v.trim()
                     state.store.updateSettings {
-                        when (k) { "tmdb" -> it.copy(tmdbKey = value); "omdb" -> it.copy(omdbKey = value); else -> it.copy(introDbKey = value) }
+                        when (k) { "tmdb" -> it.copy(tmdbKey = value); "omdb" -> it.copy(omdbKey = value); "rd" -> it.copy(realDebridToken = value); else -> it.copy(introDbKey = value) }
                     }
-                    keyEdit = null; state.showToast(if (value.isEmpty()) "Chave removida" else "Chave salva")
+                    keyEdit = null
+                    if (k == "rd" && value.isNotEmpty()) scope.launch {
+                        val u = runCatching { com.zuvion.tv.data.RealDebrid.user(value) }.getOrNull()
+                        state.showToast(if (u != null) "Real-Debrid conectado: $u" else "Token salvo, mas o Real-Debrid não o aceitou. Confira.")
+                    } else state.showToast(if (value.isEmpty()) "Chave removida" else "Chave salva")
                 }, Modifier.weight(1f), primary = true)
+                if (tv) PillButton("Pelo celular", { keyPhone = true }, Modifier.weight(1f), icon = Icons.Outlined.QrCode2)
                 if (current.isNotEmpty()) PillButton("Remover", { v = "" }, Modifier.weight(1f))
             }
         }

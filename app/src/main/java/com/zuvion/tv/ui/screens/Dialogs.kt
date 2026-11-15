@@ -41,6 +41,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import com.zuvion.tv.ui.AppState
 import com.zuvion.tv.ui.components.PillButton
 import com.zuvion.tv.ui.components.ProgressLine
@@ -56,9 +57,23 @@ fun GlassDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     val appDensity = LocalDensity.current
     Dialog(onDismiss, DialogProperties(usePlatformDefaultWidth = false)) {
       CompositionLocalProvider(LocalDensity provides appDensity) {
+        // Quando o diálogo abre com OK pressionado (segurar OK), o "soltar" chega aqui
+        // sem um "apertar" correspondente: ignora, senão confirmaria o primeiro botão.
+        val sawDown = remember { booleanArrayOf(false) }
         // Rolável: em telas baixas (TV, celular deitado, teclado aberto) nada fica cortado;
         // o foco do controle traz o item focado para a área visível.
-        Box(Modifier.fillMaxSize().background(Color(0x99040610)).systemBarsPadding().imePadding(), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxSize().background(Color(0x99040610)).systemBarsPadding().imePadding()
+            .onPreviewKeyEvent { ev ->
+                val code = ev.nativeKeyEvent.keyCode
+                val ok = code == android.view.KeyEvent.KEYCODE_DPAD_CENTER || code == android.view.KeyEvent.KEYCODE_ENTER ||
+                    code == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER
+                if (!ok) return@onPreviewKeyEvent false
+                when (ev.nativeKeyEvent.action) {
+                    android.view.KeyEvent.ACTION_DOWN -> { if (ev.nativeKeyEvent.repeatCount == 0) sawDown[0] = true; !sawDown[0] }
+                    android.view.KeyEvent.ACTION_UP -> !sawDown[0]
+                    else -> false
+                }
+            }, contentAlignment = Alignment.Center) {
             Column(
                 Modifier.padding(horizontal = 24.dp, vertical = 20.dp).widthIn(max = 600.dp).fillMaxWidth()
                     .background(Z.Panel, RoundedCornerShape(32.dp))

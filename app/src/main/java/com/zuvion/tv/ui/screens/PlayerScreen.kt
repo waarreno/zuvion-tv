@@ -49,6 +49,7 @@ import com.zuvion.tv.data.title
 import androidx.compose.material.icons.outlined.HighQuality
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.QueryStats
+import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.ui.unit.sp
 import com.zuvion.tv.meta.SkipTimes
 import androidx.compose.material.icons.outlined.AspectRatio
@@ -160,6 +161,8 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
     var triedFallback by remember { mutableStateOf(false) }
     var overrideUrl by remember(s) { mutableStateOf(s.overrideUrl) }
     var external by remember(s) { mutableStateOf(s.external) }
+    var showSources by remember { mutableStateOf(false) }
+    val hasSources = state.store.settings.stremioAddons.isNotEmpty()
     var subtitle by remember(s) { mutableStateOf(s.subtitle) }
     var startAt by remember(s) { mutableLongStateOf(s.startMs) }
     var currentUrl by remember { mutableStateOf<String?>(null) }
@@ -330,7 +333,9 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                 )
             }
     ) {
-        engine.Surface(Modifier.fillMaxSize())
+        // A tela de vídeo pertence ao motor: motor novo (realce, troca ExoPlayer/VLC) = superfície nova.
+        // Sem isso, a imagem ficava presa ao motor antigo (já fechado) e o vídeo "travava".
+        androidx.compose.runtime.key(engine) { engine.Surface(Modifier.fillMaxSize()) }
 
         if (es.buffering && es.error == null) {
             CircularProgressIndicator(color = Z.Violet, modifier = Modifier.align(Alignment.Center).size(48.dp))
@@ -469,6 +474,9 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                                 }
                             }, tint = Z.Live, active = recording.isNotEmpty())
                         }
+                        if (hasSources && (media.kind == Kind.MOVIE || media.kind == Kind.EPISODE)) item {
+                            IconGlassButton(Icons.Outlined.Hub, "Outras fontes", { showSources = true }, tint = if (external) Z.Cyan else Z.Text, active = external)
+                        }
                         if (variants.size > 1) item { IconGlassButton(Icons.Outlined.HighQuality, "Formato: ${Variants.label(media.name)}", { showFormats = true }) }
                         item { IconGlassButton(Icons.Outlined.Subtitles, "Áudio e legendas", { showTracks = true }) }
                         item {
@@ -566,6 +574,16 @@ fun PlayerScreen(state: AppState, s: Screen.Player) {
                 }
             }
             LaunchedEffect(Unit) { kotlinx.coroutines.delay(80); runCatching { fr.requestFocus() } }
+        }
+    }
+    if (showSources) {
+        // Para episódios, o id do IMDb vem da série.
+        val title = if (media.kind == Kind.EPISODE) state.repo.library.value.items[Kind.SERIES].orEmpty()
+            .firstOrNull { it.id == media.seriesId && it.playlistId == media.playlistId } ?: media else media
+        SourcesDialog(state, media, title, list, { showSources = false }) { url ->
+            showSources = false
+            startAt = if (engine.duration > 0) engine.position else startAt
+            overrideUrl = url; external = true; triedFallback = false
         }
     }
     if (showInfo) SynopsisDialog(state, media, if (isLive) nowProg else null, if (isLive) nextProg else null, subtitle) { showInfo = false }

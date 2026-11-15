@@ -228,14 +228,18 @@ private fun SeriesBody(
                     (m?.overview?.ifBlank { null } ?: i.plot)?.let { Text(it, color = Z.Muted, style = MaterialTheme.typography.bodyLarge, maxLines = 5, overflow = TextOverflow.Ellipsis) }
                     m?.cast?.takeIf { it.isNotEmpty() }?.let { Text("Elenco: " + it.take(5).joinToString(), color = Z.Faint, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        val last = data.profileData[state.store.activeProfile?.id]?.history
-                            ?.firstOrNull { it.item.seriesId == series.id && it.item.playlistId == series.playlistId }
-                        val target = last?.item?.copy(tmdbId = tmdbId) ?: allEpisodes.firstOrNull()
+                        val pdata = data.profileData[state.store.activeProfile?.id]
+                        val last = pdata?.history?.firstOrNull { it.item.seriesId == series.id && it.item.playlistId == series.playlistId }
+                        // Último episódio concluído desta série (mais recente que o último em andamento): vai para o seguinte.
+                        val lastDone = allEpisodes.mapNotNull { e -> pdata?.watched?.get(e.key)?.let { e to it } }.maxByOrNull { it.second }
+                        val nextAfterDone = lastDone?.takeIf { d -> last == null || d.second > last.updatedAt }
+                            ?.let { d -> allEpisodes.getOrNull(allEpisodes.indexOfFirst { it.key == d.first.key } + 1) }
+                        val target = nextAfterDone ?: last?.item?.copy(tmdbId = tmdbId) ?: allEpisodes.firstOrNull()
                         if (target != null) PillButton(
-                            if (last != null) "Continuar T${target.season}·E${target.episode}" else "Assistir T${target.season}·E${target.episode}",
+                            if (last != null && nextAfterDone == null) "Continuar T${target.season}·E${target.episode}" else "Assistir T${target.season}·E${target.episode}",
                             { state.play(target, allEpisodes) }, Modifier.focusRequester(fr), icon = Icons.Outlined.PlayArrow, primary = true
                         )
-                        if (last != null) PillButton("Remover de Continuar", {
+                        if (last != null && nextAfterDone == null) PillButton("Remover de Continuar", {
                             state.store.removeProgress(last.item); state.showToast("Removido de Continuar assistindo")
                         }, icon = Icons.Outlined.Close)
                         PillButton(if (fav) "Na sua lista" else "Minha lista", { state.store.toggleFavorite(series) },
@@ -254,10 +258,13 @@ private fun SeriesBody(
         item {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
                 items(episodes) { e ->
-                    val pr = state.store.progressOf(e)
+                    // Lido de "data" (estado observado): a tela atualiza ao voltar do player.
+                    val pd = data.profileData[state.store.activeProfile?.id]
+                    val pr = pd?.history?.firstOrNull { it.item.key == e.key }?.fraction
+                    val seen = pd?.watched?.containsKey(e.key) == true
                     WideCard(
-                        "E${e.episode} · ${e.name}", e.poster, { state.play(e, allEpisodes) },
-                        width = if (tv) 260.dp else 200.dp, progress = pr?.fraction,
+                        (if (seen) "✓ " else "") + "E${e.episode} · ${e.name}", e.poster, { state.play(e, allEpisodes) },
+                        width = if (tv) 260.dp else 200.dp, progress = pr ?: if (seen) 1f else null,
                         subtitle = e.plot,
                         // Segurar OK (ou toque longo): outras fontes deste episódio.
                         onLongClick = if (hasSources) ({ sourcesFor = e }) else null

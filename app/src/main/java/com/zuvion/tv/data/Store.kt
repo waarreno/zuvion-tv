@@ -80,7 +80,10 @@ class Store(context: Context, private val scope: CoroutineScope) {
             val rest = pd.history.filterNot { it.item.key == c.key }
             val done = dur > 0 && pos > dur * (settings.continueMaxPct / 100.0)
             val list = if (done) rest else listOf(HistoryEntry(c, pos, dur, System.currentTimeMillis())) + rest
-            pd.copy(history = list.take(60))
+            val watched = if (done) (pd.watched + (c.key to System.currentTimeMillis())).let { w ->
+                if (w.size > 3000) w.entries.sortedBy { it.value }.drop(500).associate { it.toPair() } else w
+            } else pd.watched
+            pd.copy(history = list.take(60), watched = watched)
         }
     }
 
@@ -95,7 +98,9 @@ class Store(context: Context, private val scope: CoroutineScope) {
     }
 
     /** Tira do "Continuar assistindo" e zera o progresso. */
-    fun removeProgress(c: Content) = updateProfileData { pd -> pd.copy(history = pd.history.filterNot { it.item.key == c.key }) }
+    fun removeProgress(c: Content) = updateProfileData { pd -> pd.copy(history = pd.history.filterNot { it.item.key == c.key }, watched = pd.watched - c.key) }
+
+    fun isWatched(c: Content): Boolean = profileData().watched.containsKey(c.key)
 
     fun progressOf(c: Content): HistoryEntry? = profileData().history.firstOrNull { it.item.key == c.key }
 

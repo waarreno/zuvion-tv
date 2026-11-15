@@ -37,6 +37,18 @@ object Http {
         }
     }
 
+    /** POST de formulário (APIs como a do Real-Debrid). */
+    suspend fun post(url: String, form: Map<String, String>, headers: Map<String, String> = emptyMap()): String = withContext(Dispatchers.IO) {
+        val body = okhttp3.FormBody.Builder().apply { form.forEach { (k, v) -> add(k, v) } }.build()
+        val rb = Request.Builder().url(url).header("User-Agent", USER_AGENT).post(body)
+        headers.forEach { (k, v) -> rb.header(k, v) }
+        client.newCall(rb.build()).execute().use { r ->
+            val text = r.body?.string() ?: ""
+            if (!r.isSuccessful) throw IOException("HTTP ${r.code} ${text.take(160)}")
+            text.ifBlank { "{}" }
+        }
+    }
+
     suspend fun getJson(url: String, headers: Map<String, String> = emptyMap()): JsonElement {
         val body = get(url, headers).trim()
         if (body.isEmpty()) return JsonNull

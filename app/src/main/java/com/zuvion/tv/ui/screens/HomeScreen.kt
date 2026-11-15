@@ -1,6 +1,10 @@
 package com.zuvion.tv.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -116,7 +120,20 @@ fun HomeScreen(state: AppState) {
             }
         }
     }
-    var hero by remember(recentMovies) { mutableStateOf(recentMovies.firstOrNull() ?: recentSeries.firstOrNull()) }
+    // Destaque: 5 filmes e 5 séries mais recentes, intercalados, trocando a cada 8 s.
+    // Na TV, focar um cartaz mostra ele no destaque por um tempo; com o foco no destaque, não troca.
+    val heroes = remember(recentMovies, recentSeries) {
+        val m = recentMovies.take(5); val s = recentSeries.take(5)
+        (0 until maxOf(m.size, s.size)).flatMap { i -> listOfNotNull(m.getOrNull(i), s.getOrNull(i)) }
+    }
+    var heroIndex by remember(heroes) { mutableIntStateOf(0) }
+    var pinned by remember { mutableStateOf<Content?>(null) }
+    var heroFocused by remember { mutableStateOf(false) }
+    LaunchedEffect(heroes, pinned, heroFocused) {
+        if (pinned != null) { kotlinx.coroutines.delay(15_000); pinned = null; return@LaunchedEffect }
+        while (heroes.size > 1 && !heroFocused) { kotlinx.coroutines.delay(8_000); heroIndex = (heroIndex + 1) % heroes.size }
+    }
+    val hero = pinned ?: heroes.getOrNull(heroIndex)
 
     LazyColumn(
         Modifier.fillMaxSize().fadeEdges(top = 14.dp),
@@ -124,7 +141,11 @@ fun HomeScreen(state: AppState) {
         verticalArrangement = Arrangement.spacedBy(26.dp)
     ) {
         item { HomeHeader(state, data.profiles.size > 1) }
-        hero?.let { h -> item { Hero(state, h) } }
+        hero?.let { h -> item {
+            androidx.compose.animation.Crossfade(h, Modifier.onFocusChanged { heroFocused = it.hasFocus }, label = "hero") { x ->
+                Hero(state, x, if (pinned == null && heroes.size > 1) heroIndex to heroes.size else null)
+            }
+        } }
         if (cont.isNotEmpty()) item {
             ShelfRow(cont, "Continuar assistindo") { e ->
                 WideCard(e.item.title, rememberLandscape(state, e.item), { state.play(e.item) }, progress = e.fraction,
@@ -148,13 +169,13 @@ fun HomeScreen(state: AppState) {
             }
         }
         if (favVod.isNotEmpty()) item {
-            ShelfRow(favVod, "Minha lista") { m -> PosterCard(m, { state.open(m) }, onFocus = { if (tv) hero = m }) }
+            ShelfRow(favVod, "Minha lista") { m -> PosterCard(m, { state.open(m) }, onFocus = { if (tv) pinned = m }) }
         }
         if (recentMovies.isNotEmpty()) item {
-            ShelfRow(recentMovies, "Filmes adicionados recentemente") { m -> PosterCard(m, { state.open(m) }, onFocus = { if (tv) hero = m }) }
+            ShelfRow(recentMovies, "Filmes adicionados recentemente") { m -> PosterCard(m, { state.open(m) }, onFocus = { if (tv) pinned = m }) }
         }
         if (recentSeries.isNotEmpty()) item {
-            ShelfRow(recentSeries, "Séries") { m -> PosterCard(m, { state.open(m) }, onFocus = { if (tv) hero = m }) }
+            ShelfRow(recentSeries, "Séries") { m -> PosterCard(m, { state.open(m) }, onFocus = { if (tv) pinned = m }) }
         }
         if (movies.isEmpty() && series.isEmpty() && channels.isEmpty() && cont.isEmpty()) item {
             Box(Modifier.height(240.dp)) { EmptyView("Abra “Ao vivo” para começar a assistir.") }
@@ -239,7 +260,7 @@ fun Clock() {
 }
 
 @Composable
-private fun Hero(state: AppState, item: Content) {
+private fun Hero(state: AppState, item: Content, dots: Pair<Int, Int>? = null) {
     val tv = LocalIsTv.current
     val m by produceState(state.meta.cached(item), item.key) { value = state.meta.forContent(item) }
     val poster = m?.poster ?: item.poster
@@ -270,6 +291,12 @@ private fun Hero(state: AppState, item: Content) {
                 androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     PillButton("Assistir", { if (item.kind == Kind.MOVIE) state.play(item) else state.open(item) }, icon = Icons.Outlined.PlayArrow, primary = true)
                     PillButton("Detalhes", { state.open(item) }, icon = Icons.Outlined.Info)
+                }
+                if (dots != null) androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    repeat(dots.second) { i ->
+                        Box(Modifier.size(width = if (i == dots.first) 18.dp else 6.dp, height = 6.dp)
+                            .background(if (i == dots.first) Z.Cyan else Z.Muted.copy(alpha = 0.4f), RoundedCornerShape(3.dp)))
+                    }
                 }
             }
             if (tv && !poster.isNullOrBlank()) {
