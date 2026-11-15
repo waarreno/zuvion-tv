@@ -112,7 +112,7 @@ fun MovieDetailScreen(state: AppState, base: Content) {
     val poster = m?.poster ?: item.poster
     val genres = m?.genres.orEmpty()
     var sources by remember { mutableStateOf(false) }
-    if (sources) SourcesDialog(state, playable, base, listOf(playable)) { sources = false }
+    if (sources) SourcesDialog(state, playable, base, listOf(playable), { sources = false })
 
     Box(Modifier.fillMaxSize()) {
         Backdrop(m?.backdrop ?: poster)
@@ -210,7 +210,7 @@ private fun SeriesBody(
     val genres = m?.genres.orEmpty()
     val hasSources = data.settings.stremioAddons.isNotEmpty()
     var sourcesFor by remember { mutableStateOf<Content?>(null) }
-    sourcesFor?.let { e -> SourcesDialog(state, e, series, allEpisodes) { sourcesFor = null } }
+    sourcesFor?.let { e -> SourcesDialog(state, e, series, allEpisodes, { sourcesFor = null }) }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().fadeEdges(),
